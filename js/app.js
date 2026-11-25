@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '16 (25 nov 2026)';
+  const APP_VERSIE = '17 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -168,22 +168,33 @@
     a.agendas.forEach(ag => (ag.dagen[sleutel] || []).forEach(x => lijst.push(Object.assign({}, x, { id: ag.nr + '-' + x.id }))));
     return lijst.map(x => {
       const gekozen = x.uid ? L.agendaWieVoor(staat.data, x.uid, sleutel) : null;
+      const tekst = x.uid ? L.agendaTekstVoor(staat.data, x.uid, sleutel) : {};
       return Object.assign({}, x, {
         uitAgenda: true,
+        origTitel: x.titel,
+        origTijd: x.tijd,
+        titel: tekst.titel || x.titel,
+        tijd: tekst.tijd || x.tijd,
+        heleDag: x.heleDag && !tekst.tijd,
+        tekstGewijzigd: !!(tekst.titel || tekst.tijd),
         gekozen: !!gekozen,
         wie: (gekozen || window.Agenda.ledenInTitel(x.titel, staat.data.leden)).filter(id => L.lid(staat.data, id))
       });
     });
   }
 
-  /** Personen kiezen bij een afspraak uit de agenda. Titel en tijd wijzig je in WeekCal. */
+  /**
+   * Een afspraak uit de agenda aanpassen: titel, tijd en wie. Dat wordt in de gedeelde planning
+   * bewaard, niet teruggeschreven naar de agenda zelf.
+   */
   function bewerkAgendaWie(datum, item) {
     const sleutel = L.datumSleutel(datum);
     const perDag = item.uid ? L.agendaWieVoor(staat.data, item.uid, sleutel) : null;
-    const dagApart = !!(staat.data.agendaWie || {})[item.uid + '|' + sleutel];
-    let html = '<h2>' + ic('kalender') + e(item.titel) + '</h2>' +
-      '<p class="uitleg">' + (item.heleDag ? 'Hele dag' : e(item.tijd)) + (item.plaats ? ' · ' + e(item.plaats) : '') +
-      ' · uit je agenda. Titel en tijd wijzig je in WeekCal.</p>' +
+    const dagApart = !!(staat.data.agendaWie || {})[item.uid + '|' + sleutel] ||
+      !!(staat.data.agendaTekst || {})[item.uid + '|' + sleutel];
+    let html = '<h2>' + ic('kalender') + 'Afspraak uit je agenda</h2>' +
+      '<label class="veld">Wat?<input type="text" name="titel" required value="' + e(item.titel) + '" autocomplete="off"></label>' +
+      '<label class="veld">Hoe laat?<input type="time" name="tijd" value="' + e(item.tijd) + '"></label>' +
       '<p class="veld-label">Wie?</p>' + persoonChips('wie', item.wie, true, false);
     if (item.herhaalt) {
       html += '<fieldset class="bereik"><legend>Geldt voor</legend>' +
@@ -191,10 +202,10 @@
         '<label><input type="radio" name="bereik" value="dag"' + (dagApart ? ' checked' : '') + '> Alleen ' + L.datumKort(datum) + '</label>' +
         '</fieldset>';
     }
-    if (!item.gekozen && item.wie.length) {
-      html += '<p class="uitleg">Herkend aan de naam in de titel. Kies hierboven om dat aan te passen.</p>';
-    }
-    const extra = perDag ? '<button type="button" class="link" data-blad="automatisch">Terug naar automatisch</button>' : '';
+    html += '<p class="uitleg">' + (item.plaats ? e(item.plaats) + '. ' : '') +
+      'Wat je hier wijzigt, geldt in de weekplanning; in WeekCal blijft de afspraak zoals ze was.' +
+      (!item.gekozen && item.wie.length ? ' De persoon is herkend aan de naam in de titel.' : '') + '</p>';
+    const extra = perDag || item.tekstGewijzigd ? '<button type="button" class="link" data-blad="automatisch">Terug zoals in de agenda</button>' : '';
     html += bladKnoppen(extra);
     openBlad(html, (form, knop) => {
       const bereik = item.herhaalt ? new FormData(form).get('bereik') : 'reeks';
@@ -203,7 +214,17 @@
         bewaar('Teruggezet');
         return;
       }
-      L.zetAgendaWie(staat.data, item.uid, sleutel, new FormData(form).getAll('wie'), bereik);
+      const f = new FormData(form);
+      const titel = (f.get('titel') || '').trim();
+      if (!titel) return false;
+      const tijd = f.get('tijd') || '';
+      L.zetAgendaTekst(staat.data, item.uid, sleutel, {
+        titel: titel !== item.origTitel ? titel : '',
+        tijd: tijd && tijd !== item.origTijd ? tijd : ''
+      }, bereik);
+      // Personen alleen bewaren als er iets veranderd is aan wat de app zelf herkende.
+      const wie = f.getAll('wie');
+      if (item.gekozen || wie.join(',') !== item.wie.join(',')) L.zetAgendaWie(staat.data, item.uid, sleutel, wie, bereik);
       bewaar(bereik === 'dag' ? 'Opgeslagen voor ' + L.datumKort(datum) : item.herhaalt ? 'Opgeslagen voor elke keer' : 'Opgeslagen');
     });
   }
@@ -317,10 +338,6 @@
 
   // ---------- Dagoverzicht ----------
 
-  function badge(aangepast) {
-    return aangepast ? '<span class="badge" title="Wijkt af van de standaardweek">alleen vandaag</span>' : '';
-  }
-
   function tekenDag() {
     const plan = L.dagPlan(staat.data, staat.datum);
     const isVandaag = L.zelfdeDag(staat.datum, vandaag());
@@ -340,9 +357,9 @@
         '</section>';
     }
 
-    // Activiteiten
-    html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('activiteit') + '</span><h2>Activiteiten</h2>' +
-      '<button class="plus" data-actie="nieuwe-activiteit" aria-label="Activiteit toevoegen">' + ic('plus') + '</button></div>';
+    // Activiteiten (zonder kop; de + staat rechtsboven in de kaart)
+    html += '<section class="kaart lijst acts-kaart">' +
+      '<button class="plus hoek" data-actie="nieuwe-activiteit" aria-label="Activiteit toevoegen">' + ic('plus') + '</button>';
     const acts = activiteitenMetAgenda(plan, staat.datum);
     if (!acts.length) {
       html += '<p class="leeg-tekst">Niets gepland. Tik op + om iets toe te voegen.</p>';
@@ -350,13 +367,11 @@
       html += '<ul class="activiteiten">' + acts.map(a => a.uitAgenda
         ? '<li class="uit-agenda"><button data-actie="agenda-item" data-id="' + e(a.id) + '">' +
           '<span class="tijd">' + (a.heleDag ? '<span class="hele-dag">hele dag</span>' : e(a.tijd)) + '</span>' +
-          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
-          '<span class="act-wie">' + personen(a.wie) +
-          '<span class="agenda-label" title="Uit je agenda">' + ic('kalender', 'mini') + (a.plaats ? e(a.plaats) : '') + '</span></span></span></button></li>'
+          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' + personen(a.wie) +
+          '<span class="agenda-label" title="Uit je agenda">' + ic('kalender', 'mini') + (a.plaats ? e(a.plaats) : '') + '</span></span></button></li>'
         : '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
           '<span class="tijd">' + e(a.tijd || '–') + '</span>' +
-          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
-          '<span class="act-wie">' + personen(a.wie) + '</span></span></button></li>'
+          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' + personen(a.wie) + '</span></button></li>'
       ).join('') + '</ul>';
     }
     if (plan.overgeslagen.length) {
@@ -369,15 +384,17 @@
     // Todo's: alleen als er voor deze dag zijn (toevoegen gaat via het tabblad Todo's)
     const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
     if (todos.length) {
-      html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('vinkje') + '</span><h2>Todo\'s</h2></div>' +
-        '<ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
+      html += '<section class="kaart lijst"><ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
     }
 
     // Avondeten
-    html += '<button class="kaart eten" data-actie="bewerk" data-veld="eten">' +
-      '<div class="kaart-kop"><span class="icoon">' + ic('bestek') + '</span><h2>Avondeten</h2>' + badge(plan.aangepast.eten) + '</div>' +
+    // Wie kookt: kleur van de persoon als achtergrond, zoals bij brengen en ophalen
+    const kok = L.lid(staat.data, plan.eten.kok);
+    html += '<button class="kaart eten' + (kok ? ' getint' : '') + '" data-actie="bewerk" data-veld="eten"' +
+      (kok ? ' style="--kleur:' + e(kok.kleur) + '" title="Kookt: ' + e(kok.naam) + '"' : '') +
+      ' aria-label="Avondeten: ' + e(plan.eten.wat || 'nog niet beslist') + (kok ? ', kookt: ' + e(kok.naam) : '') + '">' +
+      '<div class="kaart-kop"><span class="icoon">' + ic('bestek') + '</span><h2>Avondeten</h2></div>' +
       '<p class="groot">' + (plan.eten.wat ? e(plan.eten.wat) : '<span class="leeg-tekst">Nog niet beslist</span>') + '</p>' +
-      (plan.eten.kok ? '<p class="klein-grijs">Kookt: ' + persoon(plan.eten.kok) + '</p>' : '') +
       '</button>';
 
     html += plan.school
@@ -778,7 +795,7 @@
         '<button class="link gevaar" data-actie="agenda-ontkoppel" data-nr="' + e(ag.nr) + '">Ontkoppelen</button></li>').join('') + '</ul>' + fout +
         '<p class="uitleg">De afspraken staan bij de activiteiten, met een agenda-icoon. Tik op een afspraak om te kiezen voor wie ze is, ' +
         'voor die ene keer of voor elke keer. Staat een naam uit het gezin in de titel (bv. "Voetbal Pablo"), dan kiest de app die vanzelf. ' +
-        'Titel en tijd wijzig je in WeekCal; de app haalt de agenda\'s om het kwartier op.</p>';
+        'Ook titel en uur kan je daar aanpassen, alleen in de weekplanning. De app haalt de agenda\'s om het kwartier op.</p>';
       if (!staat.agendaWijzig) {
         return html + '<div class="knoppen"><button class="knop secundair" data-actie="agenda-vernieuw"' + (staat.agendaBezig ? ' disabled' : '') + '>' +
           (staat.agendaBezig ? 'Even geduld…' : 'Nu vernieuwen') + '</button>' +
