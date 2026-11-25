@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2e86ab">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Weekplanning">
+  <title>Weekplanning</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icoon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icoon.svg">
+  <link rel="stylesheet" href="css/stijl.css">
+</head>
+<body>
+  <header class="kop">
+    <button class="pijl" id="vorige" aria-label="Vorige">‹</button>
+    <div class="kop-midden">
+      <h1 id="titel">Vandaag</h1>
+      <p id="subtitel"></p>
+    </div>
+    <button class="pijl" id="volgende" aria-label="Volgende">›</button>
+  </header>
+
+  <main id="inhoud" aria-live="polite"></main>
+
+  <nav class="tabs" aria-label="Schermen">
+    <button data-scherm="dag" class="actief"><span aria-hidden="true">☀️</span>Vandaag</button>
+    <button data-scherm="week"><span aria-hidden="true">🗓️</span>Week</button>
+    <button data-scherm="gezin"><span aria-hidden="true">👪</span>Gezin</button>
+  </nav>
+
+  <dialog id="blad" class="blad">
+    <form method="dialog" id="blad-form"></form>
+  </dialog>
+
+  <div id="melding" class="melding" role="status" hidden></div>
+
+  <script src="js/logica.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
