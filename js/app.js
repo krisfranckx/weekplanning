@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '9 (25 nov 2026)';
+  const APP_VERSIE = '10 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -13,7 +13,9 @@
     scherm: 'dag',
     datum: vandaag(),
     weekStart: L.maandagVan(vandaag()),
-    weekModus: 'deze' // 'deze' of 'standaard'
+    weekModus: 'deze', // 'deze' of 'standaard'
+    todoFilter: '', // lid-id of '' voor iedereen
+    siri: null // { bezig } | { gegevens } | { fout } voor de Siri-uitleg
   };
 
   function vandaag() {
@@ -178,6 +180,11 @@
           ' – ' + eind.getDate() + ' ' + L.MAANDEN[eind.getMonth()].slice(0, 3);
         pijlen.forEach(p => { p.hidden = false; });
       }
+    } else if (staat.scherm === 'todo') {
+      const open = (staat.data.todos || []).filter(t => !t.klaar).length;
+      titel.textContent = "Todo's";
+      sub.textContent = open === 0 ? 'Alles gedaan' : open === 1 ? '1 nog te doen' : open + ' nog te doen';
+      pijlen.forEach(p => { p.hidden = true; });
     } else {
       titel.textContent = 'Gezin';
       sub.textContent = 'Wie doet er mee?';
@@ -190,7 +197,7 @@
 
   function verschuif(richting) {
     if (staat.scherm === 'dag') staat.datum = L.plusDagen(staat.datum, richting);
-    else if (staat.scherm === 'week') staat.weekStart = L.plusDagen(staat.weekStart, 7 * richting);
+    else if (staat.scherm === 'week' && staat.weekModus !== 'standaard') staat.weekStart = L.plusDagen(staat.weekStart, 7 * richting);
     teken();
   }
 
@@ -198,6 +205,7 @@
     tekenKop();
     if (staat.scherm === 'dag') tekenDag();
     else if (staat.scherm === 'week') tekenWeek();
+    else if (staat.scherm === 'todo') tekenTodos();
     else tekenGezin();
   }
 
@@ -249,6 +257,15 @@
         '<li><s>' + e(a.tijd) + ' ' + e(a.titel) + '</s> <button class="link" data-actie="herstel-activiteit" data-id="' +
         e(a.id) + '">terugzetten</button></li>').join('') + '</ul>';
     }
+    html += '</section>';
+
+    // Todo's
+    const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
+    html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('vinkje') + '</span><h2>Todo\'s</h2>' +
+      '<button class="plus" data-actie="nieuwe-todo" data-datum="' + L.datumSleutel(staat.datum) + '" aria-label="Todo toevoegen">' + ic('plus') + '</button></div>';
+    html += todos.length
+      ? '<ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul>'
+      : '<p class="leeg-tekst">Geen todo\'s met deadline ' + (isVandaag ? 'vandaag' : 'op deze dag') + '.</p>';
     html += '</section>';
 
     // Avondeten
@@ -303,11 +320,120 @@
       if (plan.activiteiten.length) {
         html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
       }
+      const todos = L.todosVoorDag(staat.data, datum, null);
+      if (todos.length) {
+        html += '<span class="wd-regel klein-grijs">' + ic('vinkje', 'mini') + todos.map(t =>
+          t.klaar ? '<s>' + e(t.titel) + '</s>' : e(t.titel)).join(', ') + '</span>';
+      }
       html += '<span class="wd-regel klein-grijs">' + ic('bestek', 'mini') + (plan.eten.wat ? e(plan.eten.wat) : '–') + '</span>';
       html += '</span>' + (aangepast ? '<span class="stip" title="Aangepast"></span>' : '') + '</button></li>';
     }
     html += '</ul><p class="uitleg">Tik op een dag om hem te bekijken of aan te passen. Een stip betekent dat die dag afwijkt van de standaardweek.</p>';
     return html;
+  }
+
+  // ---------- Todo's ----------
+
+  function deadlineTekst(sleutel) {
+    if (!sleutel) return '';
+    const datum = L.vanSleutel(sleutel);
+    const verschil = Math.round((datum - vandaag()) / 864e5);
+    if (verschil === 0) return 'vandaag';
+    if (verschil === 1) return 'morgen';
+    if (verschil === -1) return 'gisteren';
+    return L.datumKort(datum);
+  }
+
+  /** Eén todo: vinkje om af te vinken, tekst om te bewerken. */
+  function todoRij(t, metDatum) {
+    const telaat = !t.klaar && t.deadline && t.deadline < L.datumSleutel(vandaag());
+    const lid = L.lid(staat.data, t.wie);
+    const meta = [];
+    if (lid) meta.push('<span class="persoon klein" style="--kleur:' + e(lid.kleur) + '"><i>' + initiaal(lid.naam) + '</i>' + e(lid.naam) + '</span>');
+    if (t.deadline && (metDatum || telaat)) {
+      meta.push('<span class="todo-datum' + (telaat ? ' telaat' : '') + '">' + ic('klok', 'mini') + e(deadlineTekst(t.deadline)) + '</span>');
+    }
+    if (telaat) meta.push('<span class="badge gevaar">te laat</span>');
+    return '<li class="todo' + (t.klaar ? ' klaar' : '') + '">' +
+      '<label class="todo-vink"><input type="checkbox" data-todo="' + e(t.id) + '"' + (t.klaar ? ' checked' : '') +
+      ' aria-label="' + e(t.titel) + ' afvinken"><span class="vak">' + ic('vink') + '</span></label>' +
+      '<button class="todo-tekst" data-actie="bewerk-todo" data-id="' + e(t.id) + '">' +
+      '<span class="todo-titel">' + e(t.titel) + '</span>' +
+      (meta.length ? '<span class="todo-meta">' + meta.join('') + '</span>' : '') +
+      '</button></li>';
+  }
+
+  function tekenTodos() {
+    const d = staat.data;
+    if (staat.todoFilter && !L.lid(d, staat.todoFilter)) staat.todoFilter = '';
+    const filter = staat.todoFilter;
+    const gefilterd = Object.assign({}, d, { todos: (d.todos || []).filter(t => !filter || t.wie === filter) });
+    const g = L.todoGroepen(gefilterd, vandaag());
+
+    let html = '<button class="knop breed-knop" data-actie="nieuwe-todo">' + ic('plus') + 'Todo toevoegen</button>';
+    html += '<div class="filter" role="group" aria-label="Toon todo\'s van">' +
+      '<button data-actie="todo-filter" data-wie="" class="chip' + (!filter ? ' gekozen' : '') + '">Iedereen</button>' +
+      d.leden.map(l => '<button data-actie="todo-filter" data-wie="' + e(l.id) + '" class="chip' + (filter === l.id ? ' gekozen' : '') +
+        '" style="--kleur:' + e(l.kleur) + '"><span class="persoon klein"><i>' + initiaal(l.naam) + '</i>' + e(l.naam) + '</span></button>').join('') +
+      '</div>';
+
+    const groep = (titel, lijst, klasse) => lijst.length
+      ? '<section class="kaart lijst' + (klasse ? ' ' + klasse : '') + '"><div class="kaart-kop"><h2>' + titel +
+        ' <span class="aantal">' + lijst.length + '</span></h2></div><ul class="todos">' +
+        lijst.map(t => todoRij(t, true)).join('') + '</ul></section>'
+      : '';
+    html += groep('Te laat', g.telaat, 'todo-telaat') + groep('Vandaag', g.vandaag) + groep('Nog deze week', g.week) +
+      groep('Later', g.later) + groep('Zonder deadline', g.geenDatum);
+
+    const open = g.telaat.length + g.vandaag.length + g.week.length + g.later.length + g.geenDatum.length;
+    if (!open) {
+      html += '<div class="kaart leeg-kaart"><span class="icoon">' + ic('vinkje') + '</span><p>' +
+        (g.klaar.length ? 'Alles is afgevinkt. Goed bezig!' : 'Nog geen todo\'s. Voeg er een toe met een deadline en wie het doet.') + '</p></div>';
+    }
+    if (g.klaar.length) {
+      html += '<details class="kaart lijst afgevinkt"><summary>Afgevinkt <span class="aantal">' + g.klaar.length + '</span></summary>' +
+        '<ul class="todos">' + g.klaar.map(t => todoRij(t, true)).join('') + '</ul>' +
+        '<button class="link gevaar" data-actie="wis-afgevinkt">Afgevinkte todo\'s verwijderen</button></details>';
+    }
+    inhoud.innerHTML = html;
+  }
+
+  function bewerkTodo(todo, deadline) {
+    const nieuw = !todo;
+    const t = todo || { titel: '', deadline: deadline || L.datumSleutel(vandaag()), wie: (staat.scherm === 'todo' && staat.todoFilter) || null };
+    let html = '<h2>' + ic('vinkje') + (nieuw ? 'Nieuwe todo' : 'Todo') + '</h2>' +
+      '<label class="veld">Wat moet er gebeuren?<input type="text" name="titel" required value="' + e(t.titel) +
+      '" placeholder="bv. Turnzak wassen, formulier invullen" autocomplete="off"></label>' +
+      '<label class="veld">Deadline<input type="date" name="deadline" value="' + e(t.deadline || '') + '"></label>' +
+      '<p class="veld-label">Wie?</p>' + persoonChips('wie', t.wie, false, true);
+    if (!nieuw) {
+      html += '<label class="vinkje todo-klaar"><input type="checkbox" name="klaar"' + (t.klaar ? ' checked' : '') + '> Afgevinkt</label>';
+    }
+    html += bladKnoppen(nieuw ? '' : '<button type="button" class="link gevaar" data-blad="wis">Verwijderen</button>');
+
+    openBlad(html, (form, knop) => {
+      if (knop === 'wis') {
+        L.verwijderTodo(staat.data, t.id);
+        bewaar('Todo verwijderd');
+        return;
+      }
+      const f = new FormData(form);
+      const titel = (f.get('titel') || '').trim();
+      if (!titel) return false;
+      L.bewaarTodo(staat.data, {
+        id: t.id, titel: titel, deadline: f.get('deadline') || null, wie: f.get('wie') || null,
+        klaar: nieuw ? false : f.get('klaar') === 'on'
+      });
+      bewaar(nieuw ? 'Todo toegevoegd' : 'Todo opgeslagen');
+    });
+  }
+
+  function vinkTodo(id, klaar) {
+    const t = L.zetTodoKlaar(staat.data, id, klaar);
+    if (!t) return;
+    bewaar(klaar ? 'Afgevinkt: ' + t.titel : 'Weer open: ' + t.titel);
+    // even laten zien dat het vinkje gezet is, dan pas hertekenen
+    setTimeout(teken, klaar ? 350 : 0);
   }
 
   function persoonKeuze(naam, gekozen, leegTekst) {
@@ -404,6 +530,7 @@
       '<button class="knop secundair" type="submit">Toevoegen</button></form></section>';
 
     html += deelKaartHtml();
+    if (window.Sync && window.Sync.gebruiker()) html += siriKaartHtml();
 
     html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('opslag') + '</span><h2>Gegevens</h2></div>' +
       '<p class="uitleg">De planning staat altijd ook op dit toestel, zodat ze offline werkt. Een reservekopie maken of zonder Supabase overzetten: exporteer hier en importeer daar.</p>' +
@@ -483,6 +610,67 @@
       meld(fout.message || 'Er ging iets mis');
     }
     teken();
+  }
+
+  const SIRI_UITLEG = 'https://github.com/krisfranckx/weekplanning/blob/main/SIRI.md';
+
+  function siriKaartHtml() {
+    const st = staat.siri || {};
+    let html = '<section class="kaart siri"><div class="kaart-kop"><span class="icoon">' + ic('micro') + '</span><h2>Todo\'s via Siri</h2></div>';
+    if (!st.gegevens) {
+      html += '<p class="uitleg">Zeg <strong>"Hé Siri, ik heb een nieuwe todo"</strong>. Siri vraagt dan wat er moet gebeuren, voor wie en tegen wanneer, ' +
+        'en zet de todo meteen in de gedeelde planning. Dat werkt ook handsfree in de auto via CarPlay.</p>' +
+        (st.fout ? '<p class="foutmelding">' + e(st.fout) + '</p>' : '') +
+        '<div class="knoppen"><button class="knop secundair" data-actie="siri-start"' + (st.bezig ? ' disabled' : '') + '>' +
+        ic('micro') + (st.bezig ? 'Even geduld…' : 'Siri-opdracht instellen') + '</button></div>';
+      return html + '</section>';
+    }
+    const g = st.gegevens;
+    const namen = staat.data.leden.map(l => l.naam).concat(['Niemand']);
+    const waarde = (label, w, geheim) => '<div class="siri-waarde"><span class="klein-grijs">' + label + '</span>' +
+      '<code>' + e(geheim ? w.slice(0, 6) + '…' + w.slice(-4) : w) + '</code>' +
+      '<button class="knop secundair klein-knop" data-actie="kopieer" data-waarde="' + e(w) + '" data-label="' + e(label) + '">Kopieer</button></div>';
+    html += '<p class="uitleg">Maak deze opdracht één keer in de app <strong>Opdrachten</strong> op je iPhone. ' +
+      'Stap voor stap uitgelegd in <a href="' + SIRI_UITLEG + '" target="_blank" rel="noopener">SIRI.md</a>. ' +
+      'Deze sleutel is persoonlijk en geheim: deel hem niet. Je partner maakt op de eigen gsm een eigen sleutel.</p>' +
+      waarde('Adres', g.adres) + waarde('apikey', g.apikey, true) + waarde('Siri-sleutel', g.sleutel, true) +
+      '<ol class="siri-stappen">' +
+      '<li>Open <strong>Opdrachten</strong>, tik op <strong>+</strong> en noem de opdracht exact <strong>Ik heb een nieuwe todo</strong>. Die naam is wat je tegen Siri zegt.</li>' +
+      '<li>Voeg <strong>Vraag om invoer</strong> toe: type <em>Tekst</em>, vraag <em>Wat moet er gebeuren?</em></li>' +
+      '<li>Voeg <strong>Lijst</strong> toe met: ' + namen.map(n => '<em>' + e(n) + '</em>').join(', ') + '. ' +
+      'Daaronder <strong>Kies uit lijst</strong> met als vraag <em>Voor wie?</em></li>' +
+      '<li>Voeg nog eens <strong>Vraag om invoer</strong> toe: type <em>Datum</em>, vraag <em>Tegen wanneer?</em></li>' +
+      '<li>Voeg <strong>Wijzig datumnotatie</strong> (Format Date) toe: notatie <em>ISO 8601</em>, tijd <em>uit</em>.</li>' +
+      '<li>Voeg <strong>Haal inhoud op van URL</strong> toe. URL: het <em>Adres</em> hierboven. Methode <em>POST</em>. ' +
+      'Header <em>apikey</em> = de <em>apikey</em> hierboven. Verzoek: <em>JSON</em> met vier tekstvelden: ' +
+      '<em>sleutel</em> = de Siri-sleutel, <em>titel</em> = Gevraagde invoer (de eerste), <em>wie</em> = Gekozen onderdeel, ' +
+      '<em>deadline</em> = Opgemaakte datum.</li>' +
+      '<li>Voeg <strong>Toon resultaat</strong> toe met <em>Inhoud van URL</em>. Siri leest dan voor of het gelukt is.</li>' +
+      '</ol>' +
+      '<p class="uitleg">Klaar! Probeer: "Hé Siri, ik heb een nieuwe todo". Een nieuwe sleutel maken maakt de vorige ongeldig.</p>' +
+      '<div class="knoppen"><button class="knop secundair" data-actie="siri-start">Nieuwe sleutel maken</button>' +
+      '<button class="link" data-actie="siri-klaar">Verbergen</button></div>';
+    return html + '</section>';
+  }
+
+  async function startSiri() {
+    staat.siri = { bezig: true };
+    teken();
+    try {
+      staat.siri = { gegevens: await window.Sync.siriGegevens() };
+    } catch (fout) {
+      staat.siri = { fout: (fout && fout.message) || String(fout) };
+    }
+    if (staat.scherm === 'gezin') teken();
+  }
+
+  async function kopieer(tekst, label) {
+    try {
+      await navigator.clipboard.writeText(tekst);
+      meld(label + ' gekopieerd');
+    } catch (fout) {
+      prompt('Kopieer:', tekst);
+    }
   }
 
   async function kopieerKoppelLink() {
@@ -825,6 +1013,37 @@
         bewaar(knop.dataset.gerecht + ' verwijderd uit de lijst');
         teken();
         break;
+      case 'nieuwe-todo':
+        bewerkTodo(null, knop.dataset.datum);
+        break;
+      case 'bewerk-todo': {
+        const todo = (d.todos || []).find(t => t.id === knop.dataset.id);
+        if (todo) bewerkTodo(todo);
+        break;
+      }
+      case 'todo-filter':
+        staat.todoFilter = knop.dataset.wie;
+        teken();
+        break;
+      case 'wis-afgevinkt': {
+        const aantal = (d.todos || []).filter(t => t.klaar).length;
+        if (confirm(aantal + (aantal === 1 ? ' afgevinkte todo' : ' afgevinkte todo\'s') + ' verwijderen?')) {
+          d.todos = d.todos.filter(t => !t.klaar);
+          bewaar('Opgeruimd');
+          teken();
+        }
+        break;
+      }
+      case 'siri-start':
+        startSiri();
+        break;
+      case 'siri-klaar':
+        staat.siri = null;
+        teken();
+        break;
+      case 'kopieer':
+        kopieer(knop.dataset.waarde, knop.dataset.label);
+        break;
       case 'nieuw-gezien':
         zetNieuw([]);
         teken();
@@ -873,6 +1092,10 @@
 
   inhoud.addEventListener('change', ev => {
     const doel = ev.target;
+    if (doel.dataset && doel.dataset.todo) {
+      vinkTodo(doel.dataset.todo, doel.checked);
+      return;
+    }
     if (doel.id === 'importeer') {
       if (doel.files && doel.files[0]) importeer(doel.files[0]);
       doel.value = '';
@@ -889,7 +1112,7 @@
     vegenStart = { x: t.clientX, y: t.clientY };
   }, { passive: true });
   inhoud.addEventListener('touchend', ev => {
-    if (!vegenStart || staat.scherm === 'gezin' || (staat.scherm === 'week' && staat.weekModus === 'standaard')) return;
+    if (!vegenStart || staat.scherm === 'gezin' || staat.scherm === 'todo' || (staat.scherm === 'week' && staat.weekModus === 'standaard')) return;
     const t = ev.changedTouches[0];
     const dx = t.clientX - vegenStart.x;
     const dy = t.clientY - vegenStart.y;

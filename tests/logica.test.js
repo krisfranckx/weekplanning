@@ -170,3 +170,50 @@ test('verschillen tussen twee versies van de planning', () => {
   assert.equal(lijst.length, 3);
   assert.ok(lijst.some(x => x.tekst === 'Avondeten: Soep'));
 });
+
+test("todo's: toevoegen, afvinken, tonen op dag en in groepen", () => {
+  const d = L.standaardData();
+  assert.deepEqual(d.todos, []);
+  const t1 = L.bewaarTodo(d, { titel: '  Turnzak   wassen ', deadline: '2026-11-25', wie: 'kind2' });
+  const t2 = L.bewaarTodo(d, { titel: 'Formulier school', deadline: '2026-11-20', wie: 'ouder1' });
+  L.bewaarTodo(d, { titel: 'Cadeau kopen', deadline: '2026-11-27', wie: null });
+  L.bewaarTodo(d, { titel: 'Garage opruimen', deadline: null });
+  L.bewaarTodo(d, { titel: 'Volgende maand', deadline: '2026-12-15' });
+  assert.equal(L.bewaarTodo(d, { titel: '   ' }), null);
+  assert.equal(t1.titel, 'Turnzak wassen');
+
+  // Vandaag: deadline vandaag + open en te laat
+  assert.deepEqual(L.todosVoorDag(d, woensdag, woensdag).map(t => t.titel + (t.telaat ? '!' : '')), ['Formulier school!', 'Turnzak wassen']);
+  // Andere dag: enkel eigen deadline
+  assert.deepEqual(L.todosVoorDag(d, L.plusDagen(woensdag, 2), woensdag).map(t => t.titel), ['Cadeau kopen']);
+  assert.deepEqual(L.todosVoorDag(d, new Date(2026, 10, 20), woensdag).map(t => t.titel), ['Formulier school']);
+
+  L.zetTodoKlaar(d, t2.id, true);
+  assert.deepEqual(L.todosVoorDag(d, woensdag, woensdag).map(t => t.titel), ['Turnzak wassen']);
+  const g = L.todoGroepen(d, woensdag);
+  assert.deepEqual(Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v.map(t => t.titel)])), {
+    telaat: [], vandaag: ['Turnzak wassen'], week: ['Cadeau kopen'], later: ['Volgende maand'],
+    geenDatum: ['Garage opruimen'], klaar: ['Formulier school']
+  });
+
+  // Aanpassen behoudt id en klaar-status
+  L.bewaarTodo(d, { id: t2.id, titel: 'Formulier', deadline: '2026-11-26', wie: 'ouder2' });
+  assert.equal(d.todos.find(t => t.id === t2.id).klaar, true);
+  L.verwijderLid(d, 'kind2');
+  assert.equal(d.todos.find(t => t.id === t1.id).wie, null);
+  L.verwijderTodo(d, t1.id);
+  assert.equal(d.todos.length, 4);
+  // normaliseer houdt todo's, en oude data krijgt een lege lijst
+  assert.equal(L.normaliseer(JSON.parse(JSON.stringify(d))).todos.length, 4);
+  assert.deepEqual(L.normaliseer({ week: [] }).todos, []);
+});
+
+test("todo's in het wijzigingsoverzicht", () => {
+  const oud = L.standaardData();
+  const nieuw = L.normaliseer(JSON.parse(JSON.stringify(oud)));
+  const t = L.bewaarTodo(nieuw, { titel: 'Turnzak', deadline: '2026-11-26', wie: 'kind2' });
+  assert.deepEqual(L.verschillen(oud, nieuw, woensdag, 14).map(x => x.datum + ' ' + x.tekst), ['2026-11-26 Todo: Turnzak (Polly)']);
+  const later = L.normaliseer(JSON.parse(JSON.stringify(nieuw)));
+  L.zetTodoKlaar(later, t.id, true);
+  assert.deepEqual(L.verschillen(nieuw, later, woensdag, 14).map(x => x.tekst), ['Afgevinkt: Turnzak']);
+});

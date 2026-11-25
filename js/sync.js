@@ -210,6 +210,20 @@
       }
     },
 
+    /** Gegevens voor de Siri-opdracht: maakt een nieuwe persoonlijke Siri-sleutel aan. */
+    async siriGegevens() {
+      const c = config();
+      if (!c || !client || !gebruiker) throw new Error('Log eerst in om te delen');
+      const { data, error } = await client.rpc('maak_siri_sleutel');
+      if (error) {
+        if (/maak_siri_sleutel|function|schema cache/i.test(error.message || '')) {
+          throw new Error('Voer eerst het bijgewerkte supabase/opzet.sql opnieuw uit in Supabase');
+        }
+        throw error;
+      }
+      return { adres: c.url.replace(/\/+$/, '') + '/rest/v1/rpc/todo_via_siri', apikey: c.sleutel, sleutel: data };
+    },
+
     /** Na elke lokale wijziging aanroepen. */
     gewijzigd() {
       if (!config()) return;
