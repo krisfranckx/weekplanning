@@ -192,7 +192,7 @@ button.kaart:active { transform: scale(.99); }
 .vinkje { display: flex; align-items: center; gap: 6px; font-size: .9rem; color: var(--grijs); }
 .vinkje input { width: 20px; height: 20px; }
 
-input[type=text], input[type=time], select {
+input[type=text], input[type=time], input[type=url], input[type=email], input[type=password], select {
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
@@ -291,3 +291,16 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 @media (max-width: 360px) {
   .rij-twee { grid-template-columns: 1fr; }
 }
+
+/* ---------- Delen ---------- */
+
+.deelstatus {
+  margin-top: 2px; border: none; background: none; padding: 2px 8px;
+  font-size: .78rem; color: var(--grijs); border-radius: 99px;
+}
+.deelstatus[data-soort=ok] { color: #2f8f46; }
+.deelstatus[data-soort=fout] { color: var(--gevaar); }
+.deel-status[data-soort=ok]::before { content: "● "; color: #2f8f46; }
+.deel-status[data-soort=fout], .foutmelding { color: var(--gevaar); }
+.deel-form .knoppen { margin-top: 4px; }
+.deelkaart a { color: var(--accent); }

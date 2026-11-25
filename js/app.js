@@ -30,7 +30,7 @@
     return L.standaardData();
   }
 
-  function bewaar(boodschap) {
+  function bewaar(boodschap, zonderDelen) {
     try {
       L.ruimOudeAanpassingenOp(staat.data, vandaag(), 60);
       localStorage.setItem(OPSLAG_SLEUTEL, JSON.stringify(staat.data));
@@ -39,6 +39,26 @@
       meld('Opslaan lukte niet op dit toestel');
       console.warn(fout);
     }
+    if (!zonderDelen && window.Sync) window.Sync.gewijzigd();
+  }
+
+  /** Nieuwe planning van Supabase (partner of eerste koppeling). */
+  let wachtOpTekenen = false;
+  function nieuweGedeeldeData(data, bron) {
+    staat.data = L.normaliseer(data);
+    bewaar(bron === 'partner' ? 'Planning bijgewerkt door je partner' : 'Gedeelde planning geladen', true);
+    if (blad.open) wachtOpTekenen = true; // niet storen tijdens het bewerken
+    else if (!document.activeElement || !inhoud.contains(document.activeElement) || staat.scherm === 'dag') teken();
+    else wachtOpTekenen = true;
+  }
+
+  function tekenDeelstatus(st) {
+    const knop = $('#deelstatus');
+    if (!knop) return;
+    knop.hidden = st.soort === 'uit';
+    knop.textContent = ({ ok: '● ', bezig: '◌ ', offline: '○ ', fout: '⚠ ', afgemeld: '○ ' }[st.soort] || '') + st.tekst;
+    knop.dataset.soort = st.soort;
+    if (staat.scherm === 'gezin' && !inhoud.contains(document.activeElement)) teken();
   }
 
   // ---------- Hulpjes ----------
@@ -317,8 +337,10 @@
       '<button class="knop secundair" data-actie="nieuw-lid">＋ Persoon toevoegen</button>' +
       '<p class="uitleg">Voeg ook grootouders, de oppas of de naschoolse opvang toe als zij soms brengen of halen.</p></section>';
 
+    html += deelKaartHtml();
+
     html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">💾</span><h2>Gegevens</h2></div>' +
-      '<p class="uitleg">De planning wordt bewaard op dit toestel, in deze browser. Om ze op een ander toestel te zetten: exporteer hier en importeer daar.</p>' +
+      '<p class="uitleg">De planning staat altijd ook op dit toestel, zodat ze offline werkt. Een reservekopie maken of zonder Supabase overzetten: exporteer hier en importeer daar.</p>' +
       '<div class="knoppen">' +
       '<button class="knop secundair" data-actie="exporteer">Exporteren</button>' +
       '<label class="knop secundair">Importeren<input type="file" id="importeer" accept="application/json,.json" hidden></label>' +
@@ -326,6 +348,75 @@
       '<button class="link gevaar" data-actie="alles-wissen">Alles wissen en opnieuw beginnen</button>' +
       '</section>';
     inhoud.innerHTML = html;
+  }
+
+  const STAPPENPLAN = 'https://github.com/krisfranckx/weekplanning/blob/main/DELEN.md';
+
+  function deelKaartHtml() {
+    const S = window.Sync;
+    const st = S.status();
+    let html = '<section class="kaart deelkaart"><div class="kaart-kop"><span class="icoon">🔗</span><h2>Samen delen</h2></div>';
+    if (!S.config()) {
+      html += '<p class="uitleg">Deel de planning live met je partner via een gratis Supabase-project. ' +
+        'Volg eerst het <a href="' + STAPPENPLAN + '" target="_blank" rel="noopener">stappenplan</a>, vul dan hieronder de twee gegevens in. ' +
+        'Kreeg je een koppel-link van je partner? Open die gewoon, dan staat dit al ingevuld.</p>' +
+        '<form id="deel-config" class="deel-form">' +
+        '<label class="veld">Project-URL<input type="url" name="url" required placeholder="https://xxxx.supabase.co" autocomplete="off"></label>' +
+        '<label class="veld">Publieke sleutel (anon / publishable)<input type="text" name="sleutel" required autocomplete="off" spellcheck="false"></label>' +
+        '<button class="knop" type="submit">Verder</button></form>';
+    } else if (!S.gebruiker()) {
+      html += '<p class="uitleg">Log in met je eigen e-mailadres. Eerste keer? Kies <strong>Account aanmaken</strong>. ' +
+        'Staat er al een gedeelde planning, dan neemt dit toestel die over.</p>' +
+        (st.soort === 'fout' || st.soort === 'offline' ? '<p class="foutmelding">' + e(st.tekst) + '</p>' : '') +
+        '<form id="deel-login" class="deel-form">' +
+        '<label class="veld">E-mailadres<input type="email" name="email" required autocomplete="username"></label>' +
+        '<label class="veld">Wachtwoord<input type="password" name="wachtwoord" required minlength="6" autocomplete="current-password"></label>' +
+        '<div class="knoppen"><button class="knop" type="submit" value="in">Inloggen</button>' +
+        '<button class="knop secundair" type="submit" value="nieuw">Account aanmaken</button></div></form>' +
+        '<button class="link" data-actie="deel-stop">Andere Supabase-gegevens invullen</button>';
+    } else {
+      html += '<p>Ingelogd als <strong>' + e(S.gebruiker().email) + '</strong></p>' +
+        '<p class="deel-status" data-soort="' + e(st.soort) + '">' + e(st.tekst) + '</p>' +
+        '<div class="knoppen"><button class="knop secundair" data-actie="deel-link">Link voor partner kopiëren</button></div>' +
+        '<p class="uitleg">Stuur die link naar je partner. Wie hem opent, krijgt de Supabase-gegevens automatisch ingevuld en logt daarna in met het eigen e-mailadres.</p>' +
+        '<button class="link" data-actie="deel-uit">Uitloggen</button> · ' +
+        '<button class="link gevaar" data-actie="deel-stop">Delen stoppen op dit toestel</button>';
+    }
+    return html + '</section>';
+  }
+
+  async function deelFormulier(form, knopWaarde) {
+    const S = window.Sync;
+    const f = new FormData(form);
+    const knoppen = form.querySelectorAll('button');
+    knoppen.forEach(k => { k.disabled = true; });
+    try {
+      if (form.id === 'deel-config') {
+        S.zetConfig(f.get('url'), f.get('sleutel'));
+        meld('Opgeslagen. Log nu in.');
+      } else if (knopWaarde === 'nieuw') {
+        const uitkomst = await S.registreren(f.get('email'), f.get('wachtwoord'));
+        meld(uitkomst === 'bevestigen' ? 'Kijk in je mailbox en bevestig je e-mailadres, log dan in' : 'Account gemaakt en ingelogd');
+      } else {
+        await S.inloggen(f.get('email'), f.get('wachtwoord'));
+        meld('Ingelogd');
+      }
+    } catch (fout) {
+      meld(fout.message || 'Er ging iets mis');
+    }
+    teken();
+  }
+
+  async function kopieerKoppelLink() {
+    const link = window.Sync.koppelLink();
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Weekplanning', text: 'Onze weekplanning', url: link }); return; }
+      await navigator.clipboard.writeText(link);
+      meld('Link gekopieerd');
+    } catch (fout) {
+      if (fout && fout.name === 'AbortError') return;
+      prompt('Kopieer deze link:', link);
+    }
   }
 
   function gezinWijziging(doel) {
@@ -381,6 +472,7 @@
   function sluitBlad() {
     blad.close();
     bladActie = null;
+    if (wachtOpTekenen) { wachtOpTekenen = false; teken(); }
   }
 
   function bereikKeuze(datum, standaard, tekstWeek) {
@@ -530,6 +622,16 @@
     window.scrollTo(0, 0);
   });
 
+  blad.addEventListener('close', () => {
+    if (wachtOpTekenen) { wachtOpTekenen = false; teken(); }
+  });
+  inhoud.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (wachtOpTekenen && !blad.open && !inhoud.contains(document.activeElement)) { wachtOpTekenen = false; teken(); }
+    }, 0);
+  });
+  $('#deelstatus').addEventListener('click', () => { staat.scherm = 'gezin'; teken(); });
+
   $('#vorige').addEventListener('click', () => verschuif(-1));
   $('#volgende').addEventListener('click', () => verschuif(1));
 
@@ -601,6 +703,17 @@
       case 'exporteer':
         exporteer();
         break;
+      case 'deel-link':
+        kopieerKoppelLink();
+        break;
+      case 'deel-uit':
+        window.Sync.uitloggen().then(teken);
+        break;
+      case 'deel-stop':
+        if (!window.Sync.gebruiker() || confirm('Delen stoppen op dit toestel? De planning blijft hier staan, maar wordt niet meer gedeeld.')) {
+          window.Sync.wisConfig().then(teken);
+        }
+        break;
       case 'alles-wissen':
         if (confirm('Alles wissen? De planning op dit toestel gaat verloren.')) {
           staat.data = L.standaardData();
@@ -609,6 +722,12 @@
         }
         break;
     }
+  });
+
+  inhoud.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const knop = ev.submitter;
+    deelFormulier(ev.target, knop ? knop.value : '');
   });
 
   inhoud.addEventListener('change', ev => {
@@ -652,6 +771,19 @@
   // Offline werken en "zet op beginscherm"
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  if (window.Sync) {
+    const gekoppeld = window.Sync.leesKoppelLink();
+    window.Sync.start({
+      haalData: () => staat.data,
+      opNieuweData: nieuweGedeeldeData,
+      opStatus: tekenDeelstatus
+    });
+    if (gekoppeld) {
+      staat.scherm = 'gezin';
+      meld('Supabase-gegevens ingevuld. Log nu in met je eigen e-mailadres.');
+    }
   }
 
   teken();
