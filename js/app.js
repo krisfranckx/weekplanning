@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '24 (26 nov 2026)';
+  const APP_VERSIE = '25 (26 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 

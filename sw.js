@@ -1,5 +1,5 @@
 /* Eenvoudige service worker: eerst het netwerk proberen, anders de bewaarde kopie (offline). */
-const CACHE = 'weekplanning-v24';
+const CACHE = 'weekplanning-v25';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 const BESTANDEN = ['./', 'index.html', 'css/stijl.css', 'js/logica.js', 'js/app.js', 'manifest.webmanifest', 'icoon.svg', 'js/sync.js', 'js/iconen.js', 'js/agenda.js'];
 

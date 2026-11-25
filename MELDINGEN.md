@@ -54,9 +54,8 @@ Je partner doet stap 3 op de eigen gsm. Een tijd wijzigen kan altijd; dat wordt 
 - De ochtendmelding komt standaard alleen op schooldagen (dus niet in het weekend of in de
   schoolvakantie). Wil je ze elke dag, vink dan **ook op dagen zonder school** aan.
 - Geen todo's met deadline morgen? Dan krijg je ook geen herinnering.
-- De functie leest de rekenregels van de app (`js/logica.js`) van de website op het moment dat
-  je ze in Supabase zet. Verandert er later iets aan die regels (bv. nieuwe schoolvakanties),
-  plak de functie dan opnieuw en klik **Deploy**.
+- De functie bevat een kopie van de rekenregels van de app (`js/logica.js`). Verandert er later
+  iets aan die regels (bv. nieuwe schoolvakanties), plak de functie dan opnieuw en klik **Deploy**.
 - Gratis Supabase-projecten worden gepauzeerd na een week zonder gebruik. Zolang jullie de app
   gebruiken, gebeurt dat niet.
 
