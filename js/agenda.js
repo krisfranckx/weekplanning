@@ -239,6 +239,8 @@
         const sleutel = sleutelVan(d);
         const heleDag = a.heleDag || i > 0;
         (uit[sleutel] = uit[sleutel] || []).push({
+          uid: a.uid || ('titel:' + (a.titel || '')),
+          herhaalt: !!(a.rrule || a.vervangt),
           id: 'agenda-' + (a.uid || a.titel || '') + '-' + sleutelVan(begin) + (volgnr ? '-' + volgnr : '') + (i ? '-' + i : ''),
           titel: a.titel || '(zonder titel)',
           tijd: heleDag ? '' : tijdTekst(a.start),

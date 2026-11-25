@@ -220,6 +220,12 @@ button.kaart:active { transform: scale(.985); }
 .uit-agenda .act-tekst strong { font-weight: 600; }
 .agenda-label { display: inline-flex; align-items: center; font-size: .78rem; font-weight: 500; color: var(--grijs); }
 .act-wie .persoon + .agenda-label { margin-left: 6px; }
+.agenda-lijst { list-style: none; margin: 4px 0 8px; padding: 0; }
+.agenda-lijst li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.agenda-lijst li + li { border-top: 1px solid var(--lijn); }
+.agenda-naam { display: flex; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.agenda-naam .klein-grijs, .agenda-naam .foutmelding { display: block; margin-top: 2px; font-size: .82rem; }
+.agenda-lijst .link { flex: none; }
 .hele-dag { font-size: .72rem; line-height: 1.2; color: var(--grijs); display: block; }
 
 .eten .groot { font-size: 1.2rem; font-weight: 700; margin: 0; letter-spacing: -0.015em; }
