@@ -88,7 +88,7 @@ test('normaliseer vult ontbrekende velden aan', () => {
   assert.equal(d.week[0].brengen.wie, 'a');
   assert.equal(d.week[0].brengen.tijd, '08:15');
   assert.deepEqual(d.aanpassingen, {});
-  assert.equal(L.normaliseer(null).leden.length, 4);
+  assert.deepEqual(L.normaliseer(null).leden.map(l => l.naam), ['Kris', 'Eva', 'Pablo', 'Polly', 'Louis']);
 });
 
 test('oude aanpassingen worden opgeruimd', () => {
@@ -111,4 +111,14 @@ test('namen instellen via persoonlijke link', () => {
   L.zetNamen(d, 'kind', ['Cas']);
   assert.deepEqual(d.leden.filter(l => l.rol === 'kind').map(l => l.naam), ['Cas']);
   assert.equal(L.leesGezinLink('#koppel=abc'), null);
+});
+
+test('oude standaardnamen worden vervangen, aangepaste niet', () => {
+  const oud = { leden: [
+    { id: 'ouder1', naam: 'Ouder 1', rol: 'ouder' }, { id: 'ouder2', naam: 'Ouder 2', rol: 'ouder' },
+    { id: 'kind1', naam: 'Kind 1', rol: 'kind' }, { id: 'kind2', naam: 'Kind 2', rol: 'kind' }
+  ], week: [] };
+  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Kris', 'Eva', 'Pablo', 'Polly', 'Louis']);
+  oud.leden[0].naam = 'Jan';
+  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Jan', 'Ouder 2', 'Kind 1', 'Kind 2']);
 });

@@ -84,14 +84,19 @@
     };
   }
 
-  /** Startdata: twee ouders, twee kinderen. Namen pas je aan bij "Gezin". */
+  /** Startdata van ons gezin. Namen pas je aan bij "Gezin". */
+  const STANDAARD_LEDEN = [
+    { id: 'ouder1', naam: 'Kris', rol: 'ouder', kleur: KLEUREN[0] },
+    { id: 'ouder2', naam: 'Eva', rol: 'ouder', kleur: KLEUREN[1] },
+    { id: 'kind1', naam: 'Pablo', rol: 'kind', kleur: KLEUREN[2] },
+    { id: 'kind2', naam: 'Polly', rol: 'kind', kleur: KLEUREN[3] },
+    { id: 'kind3', naam: 'Louis', rol: 'kind', kleur: KLEUREN[4] }
+  ];
+  /** Namen uit de allereerste versie, die we automatisch vervangen. */
+  const OUDE_NAMEN = { ouder1: 'Ouder 1', ouder2: 'Ouder 2', kind1: 'Kind 1', kind2: 'Kind 2' };
+
   function standaardData() {
-    const leden = [
-      { id: 'ouder1', naam: 'Ouder 1', rol: 'ouder', kleur: KLEUREN[0] },
-      { id: 'ouder2', naam: 'Ouder 2', rol: 'ouder', kleur: KLEUREN[1] },
-      { id: 'kind1', naam: 'Kind 1', rol: 'kind', kleur: KLEUREN[2] },
-      { id: 'kind2', naam: 'Kind 2', rol: 'kind', kleur: KLEUREN[3] }
-    ];
+    const leden = kopie(STANDAARD_LEDEN);
     const week = [];
     for (let i = 0; i < 7; i++) {
       const dag = leegDagpatroon(i);
@@ -111,10 +116,11 @@
     if (!data || typeof data !== 'object') return basis;
     const uit = {
       versie: VERSIE,
-      leden: Array.isArray(data.leden) ? data.leden.filter(l => l && l.id) : basis.leden,
+      leden: Array.isArray(data.leden) ? kopie(data.leden.filter(l => l && l.id)) : basis.leden,
       week: [],
       aanpassingen: data.aanpassingen && typeof data.aanpassingen === 'object' ? data.aanpassingen : {}
     };
+    vervangOudeNamen(uit.leden);
     for (let i = 0; i < 7; i++) {
       const bron = (Array.isArray(data.week) && data.week[i]) || {};
       const leeg = leegDagpatroon(i);
@@ -127,6 +133,23 @@
       });
     }
     return uit;
+  }
+
+  /**
+   * Wie de app al gebruikte met "Ouder 1", "Kind 1"... krijgt de echte namen,
+   * tenzij die namen al aangepast waren.
+   */
+  function vervangOudeNamen(leden) {
+    const onaangeroerd = Object.keys(OUDE_NAMEN).every(id => {
+      const l = leden.find(x => x.id === id);
+      return l && l.naam === OUDE_NAMEN[id];
+    });
+    if (!onaangeroerd) return;
+    STANDAARD_LEDEN.forEach(std => {
+      const l = leden.find(x => x.id === std.id);
+      if (l) l.naam = std.naam;
+      else leden.push(kopie(std));
+    });
   }
 
   function kopie(waarde) {
