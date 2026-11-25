@@ -773,6 +773,15 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
+  // Persoonlijke link met namen: #gezin=ouders:A,B;kinderen:C,D
+  const gezinUitLink = L.leesGezinLink(location.hash);
+  if (gezinUitLink) {
+    Object.keys(gezinUitLink).forEach(rol => L.zetNamen(staat.data, rol, gezinUitLink[rol]));
+    const rest = location.hash.slice(1).split('&').filter(d => d && !d.startsWith('gezin=')).join('&');
+    history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+    bewaar('Namen ingesteld');
+  }
+
   if (window.Sync) {
     const gekoppeld = window.Sync.leesKoppelLink();
     window.Sync.start({

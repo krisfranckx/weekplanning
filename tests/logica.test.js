@@ -98,3 +98,17 @@ test('oude aanpassingen worden opgeruimd', () => {
   L.ruimOudeAanpassingenOp(d, woensdag, 60);
   assert.deepEqual(Object.keys(d.aanpassingen), ['2026-11-25']);
 });
+
+test('namen instellen via persoonlijke link', () => {
+  const d = L.standaardData();
+  const g = L.leesGezinLink('#gezin=' + encodeURIComponent('ouders:Ann,Bert;kinderen:Cas,Dirk,Els'));
+  assert.deepEqual(g, { ouder: ['Ann', 'Bert'], kind: ['Cas', 'Dirk', 'Els'] });
+  L.zetNamen(d, 'ouder', g.ouder);
+  L.zetNamen(d, 'kind', g.kind);
+  assert.deepEqual(d.leden.map(l => l.naam), ['Ann', 'Bert', 'Cas', 'Dirk', 'Els']);
+  assert.equal(L.lid(d, 'ouder1').naam, 'Ann'); // id blijft, planning blijft kloppen
+  assert.equal(new Set(d.leden.map(l => l.kleur)).size, 5);
+  L.zetNamen(d, 'kind', ['Cas']);
+  assert.deepEqual(d.leden.filter(l => l.rol === 'kind').map(l => l.naam), ['Cas']);
+  assert.equal(L.leesGezinLink('#koppel=abc'), null);
+});

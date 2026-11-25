@@ -310,13 +310,46 @@
     return KLEUREN.find(k => !gebruikt.includes(k)) || KLEUREN[data.leden.length % KLEUREN.length];
   }
 
+  /**
+   * Namen per rol instellen (bv. vanuit een persoonlijke link).
+   * Bestaande leden met die rol houden hun id (en dus hun plaats in de planning);
+   * ontbrekende worden toegevoegd, overtollige verwijderd.
+   */
+  function zetNamen(data, rol, namen) {
+    namen = (namen || []).map(n => String(n).trim()).filter(Boolean);
+    const bestaand = data.leden.filter(l => l.rol === rol);
+    namen.forEach((naam, i) => {
+      if (bestaand[i]) bestaand[i].naam = naam;
+      else data.leden.push({ id: maakId(), naam: naam, rol: rol, kleur: volgendeKleur(data) });
+    });
+    bestaand.slice(namen.length).forEach(l => verwijderLid(data, l.id));
+    // Volgorde: ouders, kinderen, anderen
+    const orde = { ouder: 0, kind: 1 };
+    data.leden.sort((a, b) => (orde[a.rol] ?? 2) - (orde[b.rol] ?? 2));
+  }
+
+  /** Leest '#gezin=ouders:Kris,Eva;kinderen:Pablo,Polly' (of een deel daarvan). */
+  function leesGezinLink(hash) {
+    const m = String(hash || '').match(/gezin=([^&]+)/);
+    if (!m) return null;
+    let tekst;
+    try { tekst = decodeURIComponent(m[1]); } catch (e) { return null; }
+    const uit = {};
+    tekst.split(';').forEach(deel => {
+      const [sleutel, lijst] = deel.split(':');
+      const rol = { ouders: 'ouder', kinderen: 'kind' }[(sleutel || '').trim().toLowerCase()];
+      if (rol && lijst) uit[rol] = lijst.split(',').map(n => n.trim()).filter(Boolean);
+    });
+    return Object.keys(uit).length ? uit : null;
+  }
+
   const Logica = {
     DAGEN, DAGEN_KORT, MAANDEN, KLEUREN, DAGVELDEN,
     weekdagIndex, datumSleutel, vanSleutel, plusDagen, maandagVan, zelfdeDag,
     datumLang, datumKort, weekNummer,
     maakId, standaardData, normaliseer, dagPlan,
     zetVeld, herstelVeld, bewaarActiviteit, verwijderActiviteit, herstelActiviteit,
-    ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur
+    ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Logica;

@@ -15,6 +15,16 @@ wie brengt de kinderen naar school, wie haalt ze op, welke activiteiten er zijn 
 - **Gezin**: namen, kleuren en extra personen (grootouders, oppas, opvang). Hier kan je ook
   exporteren en importeren.
 
+### Namen instellen met een link
+
+Open de app met namen in het adres, dan worden ze meteen ingevuld (en niet in de code bewaard):
+
+```
+https://krisfranckx.github.io/weekplanning/#gezin=ouders:Ann,Bert;kinderen:Cas,Dirk
+```
+
+Bestaande ouders en kinderen krijgen de nieuwe namen en houden hun plaats in de planning.
+
 ## Starten
 
 Er is geen build-stap nodig: het is gewone HTML, CSS en JavaScript.
