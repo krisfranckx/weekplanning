@@ -136,20 +136,29 @@
   }
 
   /**
-   * Wie de app al gebruikte met "Ouder 1", "Kind 1"... krijgt de echte namen,
-   * tenzij die namen al aangepast waren.
+   * Wie de app al gebruikte met "Ouder 1", "Kind 1"... krijgt de echte namen.
+   * Zelf aangepaste namen blijven staan.
    */
   function vervangOudeNamen(leden) {
-    const onaangeroerd = Object.keys(OUDE_NAMEN).every(id => {
-      const l = leden.find(x => x.id === id);
-      return l && l.naam === OUDE_NAMEN[id];
-    });
-    if (!onaangeroerd) return;
+    // Elk lid dat nog zijn oude voorbeeldnaam heeft, krijgt de echte naam.
+    let vervangen = 0;
     STANDAARD_LEDEN.forEach(std => {
       const l = leden.find(x => x.id === std.id);
-      if (l) l.naam = std.naam;
-      else leden.push(kopie(std));
+      if (l && OUDE_NAMEN[std.id] && l.naam === OUDE_NAMEN[std.id]) {
+        l.naam = std.naam;
+        vervangen++;
+      }
     });
+    // Derde kind toevoegen als er nog maar de twee oude voorbeeldkinderen waren.
+    const kinderen = leden.filter(l => l.rol === 'kind');
+    if (vervangen > 0 && !leden.some(l => l.id === 'kind3') && kinderen.length === 2 &&
+        kinderen.every(k => k.id === 'kind1' || k.id === 'kind2')) {
+      const std = STANDAARD_LEDEN.find(x => x.id === 'kind3');
+      const gebruikt = leden.map(l => l.kleur);
+      leden.push(Object.assign(kopie(std), {
+        kleur: gebruikt.includes(std.kleur) ? (KLEUREN.find(k => !gebruikt.includes(k)) || std.kleur) : std.kleur
+      }));
+    }
   }
 
   function kopie(waarde) {

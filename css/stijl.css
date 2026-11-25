@@ -304,3 +304,4 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .deel-status[data-soort=fout], .foutmelding { color: var(--gevaar); }
 .deel-form .knoppen { margin-top: 4px; }
 .deelkaart a { color: var(--accent); }
+.midden-tekst { text-align: center; }
