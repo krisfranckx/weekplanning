@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '23 (25 nov 2026)';
+  const APP_VERSIE = '24 (26 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -699,7 +699,7 @@
       '<p class="uitleg">Op die dagen valt brengen en ophalen vanzelf weg. Een pedagogische studiedag of andere vrije dag van jullie school zet je zelf via "Geen school vandaag?" onderaan de dag.</p></section>';
 
     html += deelKaartHtml();
-    if (window.Sync && window.Sync.gebruiker()) html += agendaKaartHtml() + siriKaartHtml();
+    if (window.Sync && window.Sync.gebruiker()) html += meldingKaartHtml() + agendaKaartHtml() + siriKaartHtml();
 
     html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('opslag') + '</span><h2>Gegevens</h2></div>' +
       '<p class="uitleg">De planning staat altijd ook op dit toestel, zodat ze offline werkt. Een reservekopie maken of zonder Supabase overzetten: exporteer hier en importeer daar.</p>' +
@@ -857,6 +857,153 @@
       meld((fout && fout.message) || 'Er ging iets mis');
     }
     teken();
+  }
+
+  // ---------- Pushmeldingen (ochtendmelding en todo-herinnering) ----------
+
+  const MELDING_SLEUTEL = 'weekplanning.meldingen';
+  const MELDINGEN_UITLEG = 'https://github.com/krisfranckx/weekplanning/blob/main/MELDINGEN.md';
+  const MELDING_STANDAARD = { aan: false, lid: '', ochtend: true, ochtendTijd: '07:00', zonderSchool: false, todos: true, todoTijd: '19:00' };
+
+  function meldingInstellingen() {
+    try { return Object.assign({}, MELDING_STANDAARD, JSON.parse(localStorage.getItem(MELDING_SLEUTEL)) || {}); } catch (e) { return Object.assign({}, MELDING_STANDAARD); }
+  }
+  function zetMeldingInstellingen(w) {
+    const nieuw = Object.assign(meldingInstellingen(), w);
+    try { localStorage.setItem(MELDING_SLEUTEL, JSON.stringify(nieuw)); } catch (e) { /* geen opslag */ }
+    return nieuw;
+  }
+
+  const pushKan = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const isIos = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  function meldingKaartHtml() {
+    const m = meldingInstellingen();
+    const st = staat.melding || {};
+    let html = '<section class="kaart meldingen"><div class="kaart-kop"><span class="icoon">' + ic('bel') + '</span><h2>Meldingen</h2></div>';
+    if (!pushKan()) {
+      html += '<p class="uitleg">' + (isIos()
+        ? 'Op iPhone werken meldingen alleen in de app op je beginscherm (iOS 16.4 of nieuwer). Tik in Safari op <strong>Deel</strong> en dan <strong>Zet op beginscherm</strong>, open de app van daaruit en kom hier terug.'
+        : 'Deze browser kan geen pushmeldingen ontvangen.') + '</p>';
+      return html + '</section>';
+    }
+    const gekozenLid = L.lid(staat.data, m.lid) ? m.lid : '';
+    html += '<p class="uitleg">Meldingen gelden voor dit toestel. Je partner zet ze op de eigen gsm apart aan, met eigen tijden.</p>' +
+      '<label class="veld">Ik ben' + persoonKeuze('lid', gekozenLid, 'Kies wie je bent').replace('<select ', '<select data-melding="lid" ') + '</label>' +
+      '<label class="vinkje"><input type="checkbox" data-melding="ochtend"' + (m.ochtend ? ' checked' : '') + '> Ochtendmelding: wie brengt, ophaalt en kookt</label>' +
+      '<div class="melding-sub"><label>om <input type="time" data-melding="ochtendTijd" value="' + e(m.ochtendTijd) + '"></label>' +
+      '<label class="vinkje"><input type="checkbox" data-melding="zonderSchool"' + (m.zonderSchool ? ' checked' : '') + '> ook op dagen zonder school</label></div>' +
+      '<label class="vinkje"><input type="checkbox" data-melding="todos"' + (m.todos ? ' checked' : '') + '> Herinnering de avond vóór de deadline van een todo</label>' +
+      '<div class="melding-sub"><label>om <input type="time" data-melding="todoTijd" value="' + e(m.todoTijd) + '"></label>' +
+      '<span class="klein-grijs">' + (gekozenLid ? 'jouw todo\'s en die van niemand in het bijzonder' : 'alle todo\'s') + '</span></div>' +
+      (st.fout ? '<p class="foutmelding">' + e(st.fout) + '</p>' : '');
+    if (m.aan && Notification.permission === 'granted') {
+      html += '<p class="deel-status" data-soort="ok">Meldingen staan aan op dit toestel</p>' +
+        '<div class="knoppen"><button class="knop secundair" data-actie="melding-test"' + (st.bezig ? ' disabled' : '') + '>' + (st.bezig ? 'Even geduld…' : 'Testmelding sturen') + '</button></div>' +
+        '<button class="link gevaar" data-actie="melding-uit">Meldingen uitzetten op dit toestel</button>';
+    } else if (Notification.permission === 'denied') {
+      html += '<p class="foutmelding">Meldingen zijn geblokkeerd voor deze app. Zet ze aan in de instellingen van je toestel (iPhone: Instellingen > Meldingen > Weekplanning).</p>';
+    } else {
+      html += '<div class="knoppen"><button class="knop" data-actie="melding-aan"' + (st.bezig ? ' disabled' : '') + '>' + ic('bel') + (st.bezig ? 'Even geduld…' : 'Meldingen aanzetten') + '</button></div>';
+    }
+    html += '<p class="uitleg">Eenmalig in Supabase instellen: zie <a href="' + MELDINGEN_UITLEG + '" target="_blank" rel="noopener">MELDINGEN.md</a>.</p>';
+    return html + '</section>';
+  }
+
+  function vanB64url(tekst) {
+    const s = atob(tekst.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((tekst.length + 3) % 4));
+    return Uint8Array.from(s, c => c.charCodeAt(0));
+  }
+  function naarB64url(buffer) {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /** Publieke VAPID-sleutel van het gezin; de eerste keer maakt dit toestel het sleutelpaar. */
+  async function pushSleutel() {
+    const c = window.Sync.config();
+    const basis = { project_url: c.url, apikey: c.sleutel };
+    let publiek = await window.Sync.rpc('push_sleutel', basis);
+    if (publiek) return publiek;
+    const paar = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const nieuw = naarB64url(await crypto.subtle.exportKey('raw', paar.publicKey));
+    const prive = await crypto.subtle.exportKey('jwk', paar.privateKey);
+    publiek = await window.Sync.rpc('push_sleutel', Object.assign({ nieuw_publiek: nieuw, nieuw_prive: prive }, basis));
+    return publiek;
+  }
+
+  async function abonnement(maak) {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!maak) return sub;
+    const publiek = await pushSleutel();
+    if (sub && sub.options && sub.options.applicationServerKey &&
+        naarB64url(sub.options.applicationServerKey) !== publiek) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vanB64url(publiek) });
+  }
+
+  async function bewaarMeldingen(sub) {
+    const m = meldingInstellingen();
+    await window.Sync.rpc('bewaar_push', {
+      abonnement: sub.toJSON(),
+      instellingen: { lid: L.lid(staat.data, m.lid) ? m.lid : '', ochtend: m.ochtend, ochtendTijd: m.ochtendTijd,
+        zonderSchool: m.zonderSchool, todos: m.todos, todoTijd: m.todoTijd }
+    });
+  }
+
+  async function meldingStap(werk, klaarTekst) {
+    staat.melding = { bezig: true };
+    teken();
+    try {
+      await werk();
+      staat.melding = null;
+      if (klaarTekst) meld(klaarTekst);
+    } catch (fout) {
+      staat.melding = { fout: (fout && fout.message) || String(fout) };
+    }
+    if (staat.scherm === 'gezin') teken();
+  }
+
+  function meldingenAan() {
+    // Toestemming vragen moet meteen na de tik gebeuren (iPhone).
+    const vraag = Notification.requestPermission();
+    meldingStap(async () => {
+      if (await vraag !== 'granted') throw new Error('Je toestel liet geen meldingen toe.');
+      const sub = await abonnement(true);
+      await bewaarMeldingen(sub);
+      zetMeldingInstellingen({ aan: true });
+    }, 'Meldingen staan aan');
+  }
+
+  function meldingenUit() {
+    meldingStap(async () => {
+      const sub = await abonnement(false);
+      if (sub) {
+        await window.Sync.rpc('wis_push', { endpoint: sub.endpoint }).catch(() => {});
+        await sub.unsubscribe();
+      }
+      zetMeldingInstellingen({ aan: false });
+    }, 'Meldingen staan uit');
+  }
+
+  function testMelding() {
+    meldingStap(async () => {
+      const sub = await abonnement(false);
+      if (!sub) { zetMeldingInstellingen({ aan: false }); throw new Error('Dit toestel is niet ingeschreven. Zet de meldingen opnieuw aan.'); }
+      await window.Sync.functie('meldingen', { soort: 'test', endpoint: sub.endpoint });
+    }, 'Testmelding verstuurd');
+  }
+
+  function meldingWijziging(doel) {
+    const veld = doel.dataset.melding;
+    const m = zetMeldingInstellingen({ [veld]: doel.type === 'checkbox' ? doel.checked : doel.value });
+    if (veld === 'lid') teken();
+    if (!m.aan) return;
+    abonnement(false)
+      .then(sub => sub ? bewaarMeldingen(sub).then(() => meld('Opgeslagen')) : null)
+      .catch(fout => { staat.melding = { fout: fout.message || String(fout) }; teken(); });
   }
 
   const SIRI_UITLEG = 'https://github.com/krisfranckx/weekplanning/blob/main/SIRI.md';
@@ -1334,6 +1481,15 @@
         }
         break;
       }
+      case 'melding-aan':
+        meldingenAan();
+        break;
+      case 'melding-uit':
+        meldingenUit();
+        break;
+      case 'melding-test':
+        testMelding();
+        break;
       case 'siri-start':
         startSiri();
         break;
@@ -1417,6 +1573,10 @@
     const doel = ev.target;
     if (doel.dataset && doel.dataset.todo) {
       vinkTodo(doel.dataset.todo, doel.checked);
+      return;
+    }
+    if (doel.dataset && doel.dataset.melding) {
+      meldingWijziging(doel);
       return;
     }
     if (doel.dataset && doel.dataset.instelling === 'vakanties') {

@@ -750,6 +750,48 @@
     return uit.concat(nieuw).sort((x, y) => x.datum.localeCompare(y.datum));
   }
 
+  // ---------- Pushmeldingen (tekst) ----------
+
+  /**
+   * Ochtendmelding: wie brengt, wie haalt op en wie kookt.
+   * Geeft { titel, tekst } of null (geen school en opties.ookZonderSchool is niet aan).
+   */
+  function ochtendMelding(data, datum, opties) {
+    const plan = dagPlan(data, datum);
+    if (!plan.school && !(opties && opties.ookZonderSchool)) return null;
+    const naam = id => { const l = lid(data, id); return l ? l.naam : 'nog niemand'; };
+    const regels = [];
+    if (plan.school) {
+      regels.push('Brengen: ' + naam(plan.brengen.wie) + (plan.brengen.tijd ? ' (' + plan.brengen.tijd + ')' : ''));
+      regels.push('Ophalen: ' + naam(plan.halen.wie) + (plan.halen.tijd ? ' (' + plan.halen.tijd + ')' : ''));
+    } else {
+      regels.push(plan.vakantie ? 'Geen school: ' + plan.vakantie : 'Geen school');
+    }
+    if (plan.eten.kok || plan.eten.wat) {
+      regels.push('Kookt: ' + (plan.eten.kok ? naam(plan.eten.kok) : 'nog niemand') + (plan.eten.wat ? ' (' + plan.eten.wat + ')' : ''));
+    } else {
+      regels.push('Avondeten: nog niet beslist');
+    }
+    const titel = datumLang(datum);
+    return { titel: titel.charAt(0).toUpperCase() + titel.slice(1), tekst: regels.join('\n') };
+  }
+
+  /**
+   * Herinnering de dag vóór de deadline: open todo's met deadline morgen,
+   * voor `lidId` en voor niemand in het bijzonder (zonder lidId: alle). Geeft { titel, tekst } of null.
+   */
+  function todoMelding(data, vandaag, lidId) {
+    const morgen = datumSleutel(plusDagen(vandaag, 1));
+    const lijst = sorteerTodos((data.todos || []).filter(t => !t.klaar && t.deadline === morgen &&
+      (!lidId || !t.wie || t.wie === lidId)));
+    if (!lijst.length) return null;
+    const naam = id => { const l = lid(data, id); return l ? ' (' + l.naam + ')' : ''; };
+    return {
+      titel: lijst.length === 1 ? 'Morgen te doen' : 'Morgen te doen: ' + lijst.length + " todo's",
+      tekst: lijst.map(t => t.titel + (lidId && t.wie === lidId ? '' : naam(t.wie))).join('\n')
+    };
+  }
+
   const Logica = {
     DAGEN, DAGEN_KORT, MAANDEN, KLEUREN, DAGVELDEN,
     weekdagIndex, datumSleutel, vanSleutel, plusDagen, maandagVan, zelfdeDag,
@@ -759,7 +801,7 @@
     ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
     verschillen, voegWijzigingenToe,
-    WERKPLEKKEN, zetWerk, herstelWerk, vakantieOp,
+    WERKPLEKKEN, zetWerk, herstelWerk, vakantieOp, ochtendMelding, todoMelding,
     agendaWieVoor, zetAgendaWie, wisAgendaWie, agendaTekstVoor, zetAgendaTekst,
     bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };

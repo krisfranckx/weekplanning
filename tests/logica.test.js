@@ -304,3 +304,28 @@ test('schoolvakanties: geen school, tenzij zelf "toch school" of uitgezet', () =
   assert.equal(L.normaliseer(d).vakanties, false);
   assert.equal(L.normaliseer({}).vakanties, true);
 });
+
+test('ochtendmelding: brengen, ophalen en kok', () => {
+  const d = L.standaardData();
+  L.zetVeld(d, woensdag, 'eten', { wat: 'Lasagne', kok: 'ouder2' }, 'dag');
+  const m = L.ochtendMelding(d, woensdag, {});
+  assert.equal(m.titel, 'Woensdag 25 november');
+  assert.equal(m.tekst, 'Brengen: Kris (08:15)\nOphalen: Eva (12:05)\nKookt: Eva (Lasagne)');
+  const zaterdag = new Date(2026, 10, 28);
+  assert.equal(L.ochtendMelding(d, zaterdag, {}), null);
+  assert.equal(L.ochtendMelding(d, zaterdag, { ookZonderSchool: true }).tekst, 'Geen school\nAvondeten: nog niet beslist');
+  assert.equal(L.ochtendMelding(d, new Date(2026, 11, 22), { ookZonderSchool: true }).tekst.split('\n')[0], 'Geen school: Kerstvakantie');
+});
+
+test('todo-herinnering: de dag voor de deadline, eigen en niet-toegewezen', () => {
+  const d = L.standaardData();
+  L.bewaarTodo(d, { titel: 'Turnzak wassen', deadline: '2026-11-26', wie: 'ouder1' });
+  L.bewaarTodo(d, { titel: 'Formulier', deadline: '2026-11-26', wie: null });
+  L.bewaarTodo(d, { titel: 'Cadeau', deadline: '2026-11-26', wie: 'ouder2' });
+  L.bewaarTodo(d, { titel: 'Later', deadline: '2026-11-30', wie: 'ouder1' });
+  const k = L.todoMelding(d, woensdag, 'ouder1');
+  assert.equal(k.titel, "Morgen te doen: 2 todo's");
+  assert.equal(k.tekst, 'Formulier\nTurnzak wassen');
+  assert.equal(L.todoMelding(d, woensdag, null).tekst.split('\n').length, 3);
+  assert.equal(L.todoMelding(d, L.plusDagen(woensdag, 1), 'ouder1'), null);
+});

@@ -237,6 +237,29 @@
       return data;
     },
 
+    /** Een Edge Function aanroepen als ingelogde gebruiker. Geeft het JSON-antwoord. */
+    async functie(naam, body) {
+      if (!client || !gebruiker) throw new Error('Log eerst in om te delen');
+      const { data: sessie } = await client.auth.getSession();
+      const token = sessie && sessie.session ? sessie.session.access_token : '';
+      const c = config();
+      let antwoord;
+      try {
+        antwoord = await fetch(c.url + '/functions/v1/' + naam, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: c.sleutel, Authorization: 'Bearer ' + token },
+          body: JSON.stringify(body || {})
+        });
+      } catch (fout) {
+        throw new Error('De functie "' + naam + '" is niet bereikbaar. Staat ze in Supabase (zie MELDINGEN.md)?');
+      }
+      const data = await antwoord.json().catch(() => ({}));
+      if (antwoord.status === 404 && !data.fout) throw new Error('De functie "' + naam + '" staat nog niet in Supabase (zie MELDINGEN.md).');
+      if (antwoord.status === 401 && !data.fout) throw new Error('Supabase weigert: zet bij de functie "' + naam + '" de JWT-controle uit (zie MELDINGEN.md).');
+      if (!antwoord.ok) throw new Error(data.fout || data.message || ('Foutcode ' + antwoord.status));
+      return data;
+    },
+
     /** Na elke lokale wijziging aanroepen. */
     gewijzigd() {
       if (!config()) return;
