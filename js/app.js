@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '21 (25 nov 2026)';
+  const APP_VERSIE = '22 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -466,8 +466,7 @@
       }
       const todos = L.todosVoorDag(staat.data, datum, null);
       if (todos.length) {
-        html += '<span class="wd-regel klein-grijs">' + ic('vinkje', 'mini') + todos.map(t =>
-          t.klaar ? '<s>' + e(t.titel) + '</s>' : e(t.titel)).join(', ') + '</span>';
+        html += '<span class="wd-regel klein-grijs">' + ic('vinkje', 'mini') + todos.map(t => e(t.titel)).join(', ') + '</span>';
       }
       html += '<span class="wd-regel klein-grijs">' + ic('bestek', 'mini') + (plan.eten.wat ? e(plan.eten.wat) : '–') + '</span>';
       html += '</span></button></li>';
