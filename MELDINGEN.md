@@ -11,8 +11,7 @@ Dat stel je **één keer** in, in drie stappen. Reken op een kwartiertje.
 
 1. Open je project op [supabase.com](https://supabase.com/dashboard) > **SQL Editor** > **New query**.
 2. Plak de volledige inhoud van [`supabase/opzet.sql`](supabase/opzet.sql) en klik **Run**.
-   (Je e-mailadressen onderaan deel 6 staan er al in, dus dat deel mag je laten zoals het is
-   of aanpassen zoals de vorige keer.)
+   Vul in deel 6 weer jullie eigen e-mailadressen in, zoals de vorige keer.
 
 Dit maakt de tabellen voor meldingen aan en zet een taak klaar die om de 5 minuten kijkt of
 er iets te sturen is.
