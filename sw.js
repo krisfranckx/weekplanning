@@ -1,7 +1,7 @@
 /* Eenvoudige service worker: eerst het netwerk proberen, anders de bewaarde kopie (offline). */
-const CACHE = 'weekplanning-v13';
+const CACHE = 'weekplanning-v14';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
-const BESTANDEN = ['./', 'index.html', 'css/stijl.css', 'js/logica.js', 'js/app.js', 'manifest.webmanifest', 'icoon.svg', 'js/sync.js', 'js/iconen.js'];
+const BESTANDEN = ['./', 'index.html', 'css/stijl.css', 'js/logica.js', 'js/app.js', 'manifest.webmanifest', 'icoon.svg', 'js/sync.js', 'js/iconen.js', 'js/agenda.js'];
 
 self.addEventListener('install', ev => {
   ev.waitUntil(caches.open(CACHE).then(c => c.addAll(BESTANDEN.map(b => new Request(b, { cache: 'reload' })))).then(() => self.skipWaiting()));

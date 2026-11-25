@@ -4,7 +4,9 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '13 (25 nov 2026)';
+  const APP_VERSIE = '14 (25 nov 2026)';
+  const AGENDA_SLEUTEL = 'weekplanning.agenda';
+  const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
   // ---------- Toestand ----------
 
@@ -15,7 +17,9 @@
     weekStart: L.maandagVan(vandaag()),
     weekModus: 'deze', // 'deze' of 'standaard'
     todoFilter: '', // lid-id of '' voor iedereen
-    siri: null // { bezig } | { gegevens } | { fout } voor de Siri-uitleg
+    siri: null, // { bezig } | { gegevens } | { fout } voor de Siri-uitleg
+    agenda: leesAgenda(), // afspraken uit de gekoppelde agenda (WeekCal), alleen lezen
+    agendaBezig: false
   };
 
   function vandaag() {
@@ -105,7 +109,63 @@
     knop.hidden = st.soort === 'uit';
     knop.textContent = st.tekst;
     knop.dataset.soort = st.soort;
+    if (st.soort === 'ok') vernieuwAgenda(false);
     if (staat.scherm === 'gezin' && !inhoud.contains(document.activeElement)) teken();
+  }
+
+  // ---------- Agenda (WeekCal, iCloud, Google) ----------
+  // De afspraken worden via Supabase opgehaald en per toestel bewaard. Ze zitten niet in de
+  // gedeelde planning: elk toestel haalt ze zelf op, en wijzigen gebeurt in de agenda.
+
+  function leesAgenda() {
+    try { return JSON.parse(localStorage.getItem(AGENDA_SLEUTEL)) || {}; } catch (err) { return {}; }
+  }
+
+  function bewaarAgenda(a) {
+    staat.agenda = a;
+    try { localStorage.setItem(AGENDA_SLEUTEL, JSON.stringify(a)); } catch (err) { /* vol of niet beschikbaar */ }
+  }
+
+  async function vernieuwAgenda(dwing) {
+    const S = window.Sync;
+    if (!S || !S.gebruiker() || staat.agendaBezig || !window.Agenda) return;
+    const a = staat.agenda || {};
+    if (!dwing && a.geprobeerd && Date.now() - a.geprobeerd < AGENDA_INTERVAL) return;
+    staat.agendaBezig = true;
+    if (dwing && staat.scherm === 'gezin') teken();
+    try {
+      const r = await S.rpc('agenda_ophalen');
+      if (!r || !r.ingesteld) {
+        bewaarAgenda({ geprobeerd: Date.now(), ingesteld: false });
+      } else if (r.fout) {
+        bewaarAgenda(Object.assign({}, a, { geprobeerd: Date.now(), ingesteld: true, bron: r.bron, fout: r.fout }));
+      } else {
+        const v = vandaag();
+        const dagen = window.Agenda.perDag(window.Agenda.leesIcs(r.ics), L.plusDagen(v, -14), L.plusDagen(v, 180));
+        bewaarAgenda({ geprobeerd: Date.now(), opgehaald: Date.now(), ingesteld: true, bron: r.bron, dagen: dagen });
+        if (dwing) meld('Agenda bijgewerkt');
+      }
+    } catch (fout) {
+      bewaarAgenda(Object.assign({}, a, { geprobeerd: Date.now(), fout: (fout && fout.message) || String(fout) }));
+      if (dwing) meld(staat.agenda.fout);
+    } finally {
+      staat.agendaBezig = false;
+    }
+    if (!blad.open && !inhoud.contains(document.activeElement)) teken();
+  }
+
+  /** Afspraken uit de agenda voor één dag, met gezinsleden die in de titel staan. */
+  function agendaVoorDag(datum) {
+    const a = staat.agenda;
+    if (!a || !a.ingesteld || !a.dagen) return [];
+    return (a.dagen[L.datumSleutel(datum)] || []).map(x =>
+      Object.assign({}, x, { uitAgenda: true, wie: window.Agenda.ledenInTitel(x.titel, staat.data.leden) }));
+  }
+
+  /** Eigen activiteiten en afspraken uit de agenda samen, op tijd (hele dag eerst). */
+  function activiteitenMetAgenda(plan, datum) {
+    const volgorde = x => (x.heleDag ? '00:00' : '') + (x.tijd || '99:99');
+    return plan.activiteiten.concat(agendaVoorDag(datum)).sort((x, y) => volgorde(x).localeCompare(volgorde(y)));
   }
 
   // ---------- Hulpjes ----------
@@ -237,14 +297,20 @@
     // Activiteiten
     html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('activiteit') + '</span><h2>Activiteiten</h2>' +
       '<button class="plus" data-actie="nieuwe-activiteit" aria-label="Activiteit toevoegen">' + ic('plus') + '</button></div>';
-    if (!plan.activiteiten.length) {
+    const acts = activiteitenMetAgenda(plan, staat.datum);
+    if (!acts.length) {
       html += '<p class="leeg-tekst">Niets gepland. Tik op + om iets toe te voegen.</p>';
     } else {
-      html += '<ul class="activiteiten">' + plan.activiteiten.map(a =>
-        '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
-        '<span class="tijd">' + e(a.tijd || '–') + '</span>' +
-        '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
-        '<span class="act-wie">' + personen(a.wie) + '</span></span></button></li>'
+      html += '<ul class="activiteiten">' + acts.map(a => a.uitAgenda
+        ? '<li class="uit-agenda"><button data-actie="agenda-item">' +
+          '<span class="tijd">' + (a.heleDag ? '<span class="hele-dag">hele dag</span>' : e(a.tijd)) + '</span>' +
+          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
+          '<span class="act-wie">' + personen(a.wie) +
+          '<span class="agenda-label">' + ic('kalender', 'mini') + 'Agenda' + (a.plaats ? ' · ' + e(a.plaats) : '') + '</span></span></span></button></li>'
+        : '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
+          '<span class="tijd">' + e(a.tijd || '–') + '</span>' +
+          '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
+          '<span class="act-wie">' + personen(a.wie) + '</span></span></button></li>'
       ).join('') + '</ul>';
     }
     if (plan.overgeslagen.length) {
@@ -336,8 +402,9 @@
       if (plan.school) {
         html += '<span class="wd-regel">' + ic('rugzak', 'mini') + persoon(plan.brengen.wie, '?') + ic('school', 'mini') + persoon(plan.halen.wie, '?') + '</span>';
       }
-      if (plan.activiteiten.length) {
-        html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
+      const acts = activiteitenMetAgenda(plan, datum);
+      if (acts.length) {
+        html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + acts.map(a => e(a.titel)).join(', ') + '</span>';
       }
       const todos = L.todosVoorDag(staat.data, datum, null);
       if (todos.length) {
@@ -561,7 +628,7 @@
       '<button class="knop secundair" type="submit">Toevoegen</button></form></section>';
 
     html += deelKaartHtml();
-    if (window.Sync && window.Sync.gebruiker()) html += siriKaartHtml();
+    if (window.Sync && window.Sync.gebruiker()) html += agendaKaartHtml() + siriKaartHtml();
 
     html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('opslag') + '</span><h2>Gegevens</h2></div>' +
       '<p class="uitleg">De planning staat altijd ook op dit toestel, zodat ze offline werkt. Een reservekopie maken of zonder Supabase overzetten: exporteer hier en importeer daar.</p>' +
@@ -639,6 +706,74 @@
       }
     } catch (fout) {
       meld(fout.message || 'Er ging iets mis');
+    }
+    teken();
+  }
+
+  const AGENDA_UITLEG = 'https://github.com/krisfranckx/weekplanning/blob/main/AGENDA.md';
+
+  function tijdstip(ms) {
+    if (!ms) return 'nog niet';
+    const d = new Date(ms);
+    const uur = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return L.zelfdeDag(d, vandaag()) ? 'vandaag om ' + uur : L.datumKort(d) + ' om ' + uur;
+  }
+
+  function agendaKaartHtml() {
+    const a = staat.agenda || {};
+    let html = '<section class="kaart agenda-kaart"><div class="kaart-kop"><span class="icoon">' + ic('kalender') + '</span><h2>Agenda (WeekCal)</h2></div>';
+    const fout = a.fout ? '<p class="foutmelding">' + e(a.fout) + '</p>' : '';
+    if (a.ingesteld && !staat.agendaWijzig) {
+      html += '<p>Gekoppeld met <strong>' + e(a.bron || 'je agenda') + '</strong>. Laatst opgehaald: ' + e(tijdstip(a.opgehaald)) + '.</p>' + fout +
+        '<p class="uitleg">De afspraken staan bij de activiteiten, met een agenda-icoon. Staat een naam uit het gezin in de titel ' +
+        '(bv. "Voetbal Pablo"), dan zie je die persoon erbij. Wijzigen doe je in WeekCal; de app haalt de agenda om het kwartier op.</p>' +
+        '<div class="knoppen"><button class="knop secundair" data-actie="agenda-vernieuw"' + (staat.agendaBezig ? ' disabled' : '') + '>' +
+        (staat.agendaBezig ? 'Even geduld…' : 'Nu vernieuwen') + '</button></div>' +
+        '<button class="link" data-actie="agenda-wijzig">Andere agenda-link</button> · ' +
+        '<button class="link gevaar" data-actie="agenda-ontkoppel">Ontkoppelen</button>';
+      return html + '</section>';
+    }
+    html += '<p class="uitleg">Laat afspraken uit WeekCal hier verschijnen als activiteit. Deel daarvoor één agenda ' +
+      '(bv. een aparte agenda <em>Gezin</em>) met een link, en plak die link hieronder. Dat doe je één keer: ' +
+      'de link geldt voor het hele gezin.</p>' + fout +
+      '<form id="agenda-link" class="deel-form">' +
+      '<label class="veld">Agenda-link<input type="text" name="url" required placeholder="webcal://… of https://….ics" autocomplete="off" spellcheck="false" inputmode="url"></label>' +
+      '<div class="knoppen"><button class="knop" type="submit">Koppelen</button>' +
+      (staat.agendaWijzig ? '<button class="knop secundair" type="button" data-actie="agenda-annuleer">Annuleren</button>' : '') + '</div></form>' +
+      '<details class="handmatig"><summary>Zo vind je de link (iPhone / iCloud)</summary>' +
+      '<ol class="siri-stappen">' +
+      '<li>Open de app <strong>Agenda</strong> op je iPhone en tik onderaan op <strong>Agenda\'s</strong>.</li>' +
+      '<li>Tik op <strong>ⓘ</strong> naast de agenda die je wil tonen (een iCloud-agenda, bv. <em>Gezin</em>).</li>' +
+      '<li>Zet <strong>Openbare agenda</strong> aan en tik op <strong>Deel link…</strong> > <strong>Kopieer</strong>.</li>' +
+      '<li>Plak de link hierboven en tik op <strong>Koppelen</strong>.</li>' +
+      '</ol>' +
+      '<p class="uitleg">WeekCal toont dezelfde agenda\'s als de app Agenda, dus alles wat je in WeekCal in die agenda zet, komt hier ook. ' +
+      'Iedereen met de link kan de agenda lezen: deel hem niet verder. Google Agenda? Gebruik het <em>geheime adres in iCal-indeling</em>. ' +
+      'Meer uitleg in <a href="' + AGENDA_UITLEG + '" target="_blank" rel="noopener">AGENDA.md</a>.</p></details>';
+    return html + '</section>';
+  }
+
+  async function koppelAgenda(form) {
+    const knoppen = form.querySelectorAll('button');
+    knoppen.forEach(k => { k.disabled = true; });
+    try {
+      await window.Sync.rpc('zet_agenda_link', { url: new FormData(form).get('url') });
+      staat.agendaWijzig = false;
+      bewaarAgenda({ ingesteld: true });
+      await vernieuwAgenda(true);
+    } catch (fout) {
+      meld((fout && fout.message) || 'Er ging iets mis');
+      knoppen.forEach(k => { k.disabled = false; });
+    }
+  }
+
+  async function ontkoppelAgenda() {
+    try {
+      await window.Sync.rpc('zet_agenda_link', { url: '' });
+      bewaarAgenda({ geprobeerd: Date.now(), ingesteld: false });
+      meld('Agenda ontkoppeld');
+    } catch (fout) {
+      meld((fout && fout.message) || 'Er ging iets mis');
     }
     teken();
   }
@@ -1098,6 +1233,23 @@
       case 'siri-start':
         startSiri();
         break;
+      case 'agenda-item':
+        meld('Uit je agenda: wijzigen doe je in WeekCal');
+        break;
+      case 'agenda-vernieuw':
+        vernieuwAgenda(true);
+        break;
+      case 'agenda-wijzig':
+        staat.agendaWijzig = true;
+        teken();
+        break;
+      case 'agenda-annuleer':
+        staat.agendaWijzig = false;
+        teken();
+        break;
+      case 'agenda-ontkoppel':
+        if (confirm('Agenda ontkoppelen? De afspraken verdwijnen dan uit de app, voor het hele gezin.')) ontkoppelAgenda();
+        break;
       case 'siri-klaar':
         staat.siri = null;
         teken();
@@ -1137,6 +1289,10 @@
 
   inhoud.addEventListener('submit', ev => {
     ev.preventDefault();
+    if (ev.target.id === 'agenda-link') {
+      koppelAgenda(ev.target);
+      return;
+    }
     if (ev.target.id === 'gerecht-toevoegen') {
       const naam = (new FormData(ev.target).get('gerecht') || '').trim();
       if (naam) {
@@ -1185,6 +1341,7 @@
   let laatstGetekendeVandaag = L.datumSleutel(vandaag());
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
+    vernieuwAgenda(false);
     const nu = L.datumSleutel(vandaag());
     if (nu !== laatstGetekendeVandaag) {
       if (L.datumSleutel(staat.datum) === laatstGetekendeVandaag) staat.datum = vandaag();
