@@ -88,7 +88,7 @@ test('normaliseer vult ontbrekende velden aan', () => {
   assert.equal(d.week[0].brengen.wie, 'a');
   assert.equal(d.week[0].brengen.tijd, '08:15');
   assert.deepEqual(d.aanpassingen, {});
-  assert.equal(L.normaliseer(null).leden.length, 4);
+  assert.deepEqual(L.normaliseer(null).leden.map(l => l.naam), ['Kris', 'Eva', 'Pablo', 'Polly', 'Louis']);
 });
 
 test('oude aanpassingen worden opgeruimd', () => {
@@ -97,4 +97,28 @@ test('oude aanpassingen worden opgeruimd', () => {
   L.zetVeld(d, woensdag, 'school', false, 'dag');
   L.ruimOudeAanpassingenOp(d, woensdag, 60);
   assert.deepEqual(Object.keys(d.aanpassingen), ['2026-11-25']);
+});
+
+test('namen instellen via persoonlijke link', () => {
+  const d = L.standaardData();
+  const g = L.leesGezinLink('#gezin=' + encodeURIComponent('ouders:Ann,Bert;kinderen:Cas,Dirk,Els'));
+  assert.deepEqual(g, { ouder: ['Ann', 'Bert'], kind: ['Cas', 'Dirk', 'Els'] });
+  L.zetNamen(d, 'ouder', g.ouder);
+  L.zetNamen(d, 'kind', g.kind);
+  assert.deepEqual(d.leden.map(l => l.naam), ['Ann', 'Bert', 'Cas', 'Dirk', 'Els']);
+  assert.equal(L.lid(d, 'ouder1').naam, 'Ann'); // id blijft, planning blijft kloppen
+  assert.equal(new Set(d.leden.map(l => l.kleur)).size, 5);
+  L.zetNamen(d, 'kind', ['Cas']);
+  assert.deepEqual(d.leden.filter(l => l.rol === 'kind').map(l => l.naam), ['Cas']);
+  assert.equal(L.leesGezinLink('#koppel=abc'), null);
+});
+
+test('oude standaardnamen worden vervangen, aangepaste niet', () => {
+  const oud = { leden: [
+    { id: 'ouder1', naam: 'Ouder 1', rol: 'ouder' }, { id: 'ouder2', naam: 'Ouder 2', rol: 'ouder' },
+    { id: 'kind1', naam: 'Kind 1', rol: 'kind' }, { id: 'kind2', naam: 'Kind 2', rol: 'kind' }
+  ], week: [] };
+  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Kris', 'Eva', 'Pablo', 'Polly', 'Louis']);
+  oud.leden[0].naam = 'Jan';
+  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Jan', 'Ouder 2', 'Kind 1', 'Kind 2']);
 });
