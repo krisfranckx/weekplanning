@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '8 (25 nov 2026)';
+  const APP_VERSIE = '9 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -73,7 +73,7 @@
   function nieuwKaartHtml() {
     const lijst = leesNieuw();
     if (!lijst.length) return '';
-    return '<section class="kaart nieuw-kaart"><div class="kaart-kop"><span class="icoon">🔔</span>' +
+    return '<section class="kaart nieuw-kaart"><div class="kaart-kop"><span class="icoon waarschuwing">' + ic('bel') + '</span>' +
       '<h2>Gewijzigd sinds je vorige bezoek</h2></div><ul class="nieuw-lijst">' +
       lijst.map(x => '<li><button data-actie="open-dag" data-datum="' + e(x.datum) + '">' +
         '<span class="nieuw-datum">' + e(L.datumKort(L.vanSleutel(x.datum))) + '</span> ' + e(x.tekst) + '</button></li>').join('') +
@@ -101,7 +101,7 @@
     const knop = $('#deelstatus');
     if (!knop) return;
     knop.hidden = st.soort === 'uit';
-    knop.textContent = ({ ok: '● ', bezig: '◌ ', offline: '○ ', fout: '⚠ ', afgemeld: '○ ' }[st.soort] || '') + st.tekst;
+    knop.textContent = st.tekst;
     knop.dataset.soort = st.soort;
     if (staat.scherm === 'gezin' && !inhoud.contains(document.activeElement)) teken();
   }
@@ -119,16 +119,19 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  const ic = (naam, klasse) => window.Icoon(naam, klasse);
+  const initiaal = naam => e(String(naam || '?').trim().charAt(0).toUpperCase());
+
   function persoon(id, leegTekst) {
     const lid = L.lid(staat.data, id);
     if (!lid) return '<span class="persoon leeg">' + e(leegTekst || 'Nog niemand') + '</span>';
-    return '<span class="persoon" style="--kleur:' + e(lid.kleur) + '"><i></i>' + e(lid.naam) + '</span>';
+    return '<span class="persoon" style="--kleur:' + e(lid.kleur) + '"><i>' + initiaal(lid.naam) + '</i>' + e(lid.naam) + '</span>';
   }
 
   function personen(ids) {
     const lijst = (ids || []).map(id => L.lid(staat.data, id)).filter(Boolean);
     if (!lijst.length) return '';
-    return lijst.map(l => '<span class="persoon klein" style="--kleur:' + e(l.kleur) + '"><i></i>' + e(l.naam) + '</span>').join('');
+    return lijst.map(l => '<span class="persoon klein" style="--kleur:' + e(l.kleur) + '"><i>' + initiaal(l.naam) + '</i>' + e(l.naam) + '</span>').join('');
   }
 
   function weekdagNaam(datum) {
@@ -210,28 +213,28 @@
     let html = '';
 
     if (!isVandaag) {
-      html += '<button class="naar-vandaag" data-actie="naar-vandaag">↩ Terug naar vandaag</button>';
+      html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
     html += nieuwKaartHtml();
 
     if (plan.school) {
       html +=
         '<div class="rij-twee">' +
-        kaart('brengen', '🎒', 'Naar school brengen', persoon(plan.brengen.wie), plan.brengen.tijd, plan.aangepast.brengen) +
-        kaart('halen', '🏫', 'Ophalen van school', persoon(plan.halen.wie), plan.halen.tijd, plan.aangepast.halen) +
+        kaart('brengen', ic('rugzak'), 'Naar school brengen', persoon(plan.brengen.wie), plan.brengen.tijd, plan.aangepast.brengen) +
+        kaart('halen', ic('school'), 'Ophalen van school', persoon(plan.halen.wie), plan.halen.tijd, plan.aangepast.halen) +
         '</div>';
     } else {
       html +=
         '<button class="kaart geen-school" data-actie="bewerk" data-veld="school">' +
-        '<span class="icoon">🌤️</span><span><strong>Geen school</strong>' +
+        '<span class="icoon">' + ic('wolk') + '</span><span><strong>Geen school</strong>' +
         '<small>' + (plan.aangepast.school ? 'Alleen vandaag. ' : '') + 'Tik om te wijzigen</small></span></button>';
     }
 
     // Activiteiten
-    html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">📅</span><h2>Activiteiten</h2>' +
-      '<button class="plus" data-actie="nieuwe-activiteit" aria-label="Activiteit toevoegen">＋</button></div>';
+    html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('activiteit') + '</span><h2>Activiteiten</h2>' +
+      '<button class="plus" data-actie="nieuwe-activiteit" aria-label="Activiteit toevoegen">' + ic('plus') + '</button></div>';
     if (!plan.activiteiten.length) {
-      html += '<p class="leeg-tekst">Niets gepland. Tik op ＋ om iets toe te voegen.</p>';
+      html += '<p class="leeg-tekst">Niets gepland. Tik op + om iets toe te voegen.</p>';
     } else {
       html += '<ul class="activiteiten">' + plan.activiteiten.map(a =>
         '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
@@ -250,7 +253,7 @@
 
     // Avondeten
     html += '<button class="kaart eten" data-actie="bewerk" data-veld="eten">' +
-      '<div class="kaart-kop"><span class="icoon">🍝</span><h2>Avondeten</h2>' + badge(plan.aangepast.eten) + '</div>' +
+      '<div class="kaart-kop"><span class="icoon">' + ic('bestek') + '</span><h2>Avondeten</h2>' + badge(plan.aangepast.eten) + '</div>' +
       '<p class="groot">' + (plan.eten.wat ? e(plan.eten.wat) : '<span class="leeg-tekst">Nog niet beslist</span>') + '</p>' +
       (plan.eten.kok ? '<p class="klein-grijs">Kookt: ' + persoon(plan.eten.kok) + '</p>' : '') +
       '</button>';
@@ -266,7 +269,7 @@
     return '<button class="kaart taak" data-actie="bewerk" data-veld="' + veld + '">' +
       '<div class="kaart-kop"><span class="icoon">' + icoon + '</span><h2>' + label + '</h2></div>' +
       '<div class="taak-wie">' + wieHtml + '</div>' +
-      '<div class="taak-onder"><span class="tijd">' + e(tijd || '') + '</span>' + badge(aangepast) + '</div>' +
+      '<div class="taak-onder"><span class="tijd">' + (tijd ? ic('klok') + e(tijd) : '') + '</span>' + badge(aangepast) + '</div>' +
       '</button>';
   }
 
@@ -293,14 +296,14 @@
         '<span class="wd-datum"><strong>' + L.DAGEN_KORT[i] + '</strong>' + datum.getDate() + '</span>' +
         '<span class="wd-info">';
       if (plan.school) {
-        html += '<span class="wd-regel">🎒 ' + persoon(plan.brengen.wie, '?') + ' 🏫 ' + persoon(plan.halen.wie, '?') + '</span>';
+        html += '<span class="wd-regel">' + ic('rugzak', 'mini') + persoon(plan.brengen.wie, '?') + ic('school', 'mini') + persoon(plan.halen.wie, '?') + '</span>';
       } else {
         html += '<span class="wd-regel klein-grijs">Geen school</span>';
       }
       if (plan.activiteiten.length) {
-        html += '<span class="wd-regel klein-grijs">📅 ' + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
+        html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
       }
-      html += '<span class="wd-regel klein-grijs">🍝 ' + (plan.eten.wat ? e(plan.eten.wat) : '–') + '</span>';
+      html += '<span class="wd-regel klein-grijs">' + ic('bestek', 'mini') + (plan.eten.wat ? e(plan.eten.wat) : '–') + '</span>';
       html += '</span>' + (aangepast ? '<span class="stip" title="Aangepast"></span>' : '') + '</button></li>';
     }
     html += '</ul><p class="uitleg">Tik op een dag om hem te bekijken of aan te passen. Een stip betekent dat die dag afwijkt van de standaardweek.</p>';
@@ -324,15 +327,15 @@
         '<label class="vinkje"><input type="checkbox" name="school"' + (dag.school ? ' checked' : '') + '> school</label></div>';
       if (dag.school) {
         html += '<div class="sw-raster">' +
-          '<label>🎒 Brengen' + persoonKeuze('brengen.wie', dag.brengen.wie) + '</label>' +
+          '<label>Brengen' + persoonKeuze('brengen.wie', dag.brengen.wie) + '</label>' +
           '<label>om<input type="time" name="brengen.tijd" value="' + e(dag.brengen.tijd) + '"></label>' +
-          '<label>🏫 Halen' + persoonKeuze('halen.wie', dag.halen.wie) + '</label>' +
+          '<label>Ophalen' + persoonKeuze('halen.wie', dag.halen.wie) + '</label>' +
           '<label>om<input type="time" name="halen.tijd" value="' + e(dag.halen.tijd) + '"></label>' +
           '</div>';
       }
       html += '<div class="sw-raster">' +
         '<button type="button" class="eten-knop breed" data-actie="bewerk-std-eten" data-weekdag="' + i + '">' +
-        '<span class="klein-grijs">🍝 Avondeten</span>' +
+        '<span class="klein-grijs">' + ic('bestek', 'mini') + 'Avondeten</span>' +
         '<span class="eten-wat">' + (dag.eten.wat ? e(dag.eten.wat) : '<span class="leeg-tekst">Kies een gerecht</span>') + '</span>' +
         (dag.eten.kok ? '<span class="klein-grijs">Kookt: ' + persoon(dag.eten.kok) + '</span>' : '') +
         '</button>' +
@@ -340,7 +343,7 @@
       html += '<div class="sw-acts">' + dag.activiteiten.map(a =>
         '<button class="chip" data-actie="bewerk-vaste-activiteit" data-weekdag="' + i + '" data-id="' + e(a.id) + '">' +
         e(a.tijd) + ' ' + e(a.titel) + '</button>').join('') +
-        '<button class="chip plus-chip" data-actie="nieuwe-vaste-activiteit" data-weekdag="' + i + '">＋ vaste activiteit</button></div>';
+        '<button class="chip plus-chip" data-actie="nieuwe-vaste-activiteit" data-weekdag="' + i + '">' + ic('plus', 'mini') + 'Vaste activiteit</button></div>';
       html += '</section>';
     }
     html += '</div>';
@@ -379,7 +382,7 @@
   // ---------- Gezin ----------
 
   function tekenGezin() {
-    let html = '<section class="kaart"><div class="kaart-kop"><span class="icoon">👪</span><h2>Gezinsleden</h2></div>' +
+    let html = '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('gezin') + '</span><h2>Gezinsleden</h2></div>' +
       '<ul class="leden">' + staat.data.leden.map(l =>
         '<li data-lid="' + e(l.id) + '">' +
         '<input type="color" name="kleur" value="' + e(l.kleur) + '" aria-label="Kleur">' +
@@ -387,12 +390,12 @@
         '<select name="rol" aria-label="Rol">' +
         ['ouder', 'kind', 'andere'].map(r => '<option value="' + r + '"' + (l.rol === r ? ' selected' : '') + '>' + r + '</option>').join('') +
         '</select>' +
-        '<button class="wis" data-actie="wis-lid" data-id="' + e(l.id) + '" aria-label="Verwijder ' + e(l.naam) + '">🗑</button>' +
+        '<button class="wis" data-actie="wis-lid" data-id="' + e(l.id) + '" aria-label="Verwijder ' + e(l.naam) + '">' + ic('vuilbak') + '</button>' +
         '</li>').join('') + '</ul>' +
-      '<button class="knop secundair" data-actie="nieuw-lid">＋ Persoon toevoegen</button>' +
+      '<button class="knop secundair" data-actie="nieuw-lid">' + ic('plus') + 'Persoon toevoegen</button>' +
       '<p class="uitleg">Voeg ook grootouders, de oppas of de naschoolse opvang toe als zij soms brengen of halen.</p></section>';
 
-    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">🍽️</span><h2>Gerechten</h2></div>' +
+    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('bestek') + '</span><h2>Gerechten</h2></div>' +
       '<p class="uitleg">Hieruit kies je bij het avondeten. Een nieuw gerecht dat je daar typt, komt er vanzelf bij.</p>' +
       '<div class="chips gerechtenbeheer">' + L.gerechtenLijst(staat.data).map(g =>
         '<span class="chip">' + e(g) + '<button class="chip-wis" data-actie="wis-gerecht" data-gerecht="' + e(g) +
@@ -402,7 +405,7 @@
 
     html += deelKaartHtml();
 
-    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">💾</span><h2>Gegevens</h2></div>' +
+    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('opslag') + '</span><h2>Gegevens</h2></div>' +
       '<p class="uitleg">De planning staat altijd ook op dit toestel, zodat ze offline werkt. Een reservekopie maken of zonder Supabase overzetten: exporteer hier en importeer daar.</p>' +
       '<div class="knoppen">' +
       '<button class="knop secundair" data-actie="exporteer">Exporteren</button>' +
@@ -419,7 +422,7 @@
   function deelKaartHtml() {
     const S = window.Sync;
     const st = S.status();
-    let html = '<section class="kaart deelkaart"><div class="kaart-kop"><span class="icoon">🔗</span><h2>Samen delen</h2></div>';
+    let html = '<section class="kaart deelkaart"><div class="kaart-kop"><span class="icoon">' + ic('link') + '</span><h2>Samen delen</h2></div>';
     if (!S.config()) {
       html += '<p class="uitleg">Deel de planning live met je partner via een gratis Supabase-project. ' +
         'Volg eerst het <a href="' + STAPPENPLAN + '" target="_blank" rel="noopener">stappenplan</a>, vul dan hieronder de twee gegevens in. ' +
@@ -567,7 +570,7 @@
     }
     html += staat.data.leden.map(l =>
       '<label class="chip-keuze" style="--kleur:' + e(l.kleur) + '"><input type="' + type + '" name="' + naam + '" value="' + e(l.id) + '"' +
-      (lijst.includes(l.id) ? ' checked' : '') + '><span><i></i>' + e(l.naam) + '</span></label>').join('');
+      (lijst.includes(l.id) ? ' checked' : '') + '><span><i>' + initiaal(l.naam) + '</i>' + e(l.naam) + '</span></label>').join('');
     return html + '</div>';
   }
 
@@ -602,17 +605,17 @@
     let html;
 
     if (veld === 'brengen' || veld === 'halen') {
-      const titel = veld === 'brengen' ? '🎒 Wie brengt naar school?' : '🏫 Wie haalt op van school?';
+      const titel = veld === 'brengen' ? ic('rugzak') + 'Wie brengt naar school?' : ic('school') + 'Wie haalt op van school?';
       html = '<h2>' + titel + '</h2>' +
         persoonChips('wie', plan[veld].wie, false, true) +
         '<label class="veld">Tijd<input type="time" name="tijd" value="' + e(plan[veld].tijd) + '"></label>';
     } else if (veld === 'eten') {
-      html = '<h2>🍝 Avondeten</h2>' +
+      html = '<h2>' + ic('bestek') + 'Avondeten</h2>' +
         '<label class="veld">Wat eten we?<input type="text" name="wat" value="' + e(plan.eten.wat) + '" placeholder="Kies hieronder of typ een nieuw gerecht" autocomplete="off"></label>' +
         '<div class="gerecht-keuze" id="gerecht-keuze">' + gerechtChips('') + '</div>' +
         '<p class="veld-label">Wie kookt?</p>' + persoonChips('kok', plan.eten.kok, false, true);
     } else if (veld === 'school') {
-      html = '<h2>📚 School</h2>' +
+      html = '<h2>' + ic('boek') + 'School</h2>' +
         '<div class="chips">' +
         '<label class="chip-keuze"><input type="radio" name="school" value="ja"' + (plan.school ? ' checked' : '') + '><span>Er is school</span></label>' +
         '<label class="chip-keuze"><input type="radio" name="school" value="nee"' + (!plan.school ? ' checked' : '') + '><span>Geen school</span></label>' +
@@ -649,7 +652,7 @@
     const nieuw = !activiteit;
     const act = activiteit || { titel: '', tijd: '', wie: [] };
     const isVast = !nieuw && !act.eenmalig;
-    let html = '<h2>📅 ' + (nieuw ? 'Nieuwe activiteit' : 'Activiteit') + '</h2>' +
+    let html = '<h2>' + ic('activiteit') + (nieuw ? 'Nieuwe activiteit' : 'Activiteit') + '</h2>' +
       '<label class="veld">Wat?<input type="text" name="titel" required value="' + e(act.titel) + '" placeholder="bv. Zwemles, verjaardagsfeest" autocomplete="off"></label>' +
       '<label class="veld">Hoe laat?<input type="time" name="tijd" value="' + e(act.tijd) + '"></label>' +
       '<p class="veld-label">Wie?</p>' + persoonChips('wie', act.wie, true, false);
@@ -934,5 +937,6 @@
   }
 
   zetBadge(leesNieuw().length);
+  document.querySelectorAll('[data-icoon]').forEach(el => { el.innerHTML = ic(el.dataset.icoon); });
   teken();
 })();
