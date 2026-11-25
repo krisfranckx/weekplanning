@@ -1,6 +1,6 @@
 # Afspraken uit WeekCal in de weekplanning
 
-Afspraken die je in WeekCal (of de app Agenda) in één bepaalde agenda zet, verschijnen in de
+Afspraken die je in WeekCal (of de app Agenda) in een gekoppelde agenda zet, verschijnen in de
 weekplanning bij de **activiteiten**, met een klein agenda-icoon. Dat werkt in één richting:
 wijzigen of verwijderen doe je in WeekCal, niet in de app.
 
@@ -39,9 +39,12 @@ dus deel hem niet verder. Zet je *Openbare agenda* later uit, dan werkt de link 
 
 ### 4. De link in de app plakken
 
-Open de weekplanning, ga naar **Gezin** > **Agenda (WeekCal)**, plak de link en tik op
+Open de weekplanning, ga naar **Gezin** > **Agenda's (WeekCal)**, plak de link en tik op
 **Koppelen**. Je moet daarvoor ingelogd zijn bij *Samen delen*. De link geldt voor het hele
 gezin: je partner hoeft niets in te stellen.
+
+Nog een agenda erbij (bv. die van Eva)? Tik op **Agenda toevoegen** en plak de tweede link.
+Je kan tot vijf agenda's koppelen; ze werken allemaal op dezelfde manier.
 
 ## Goed om te weten
 
@@ -55,4 +58,4 @@ gezin: je partner hoeft niets in te stellen.
 - Afspraken van de voorbije twee weken tot een half jaar vooruit worden getoond. Herhalende
   afspraken (wekelijks, om de twee weken, maandelijks, …) en hele-dag-afspraken werken ook.
 - De afspraken staan op elk toestel apart in het geheugen, zodat je ze ook offline ziet.
-- Ontkoppelen kan bij **Gezin** > **Agenda (WeekCal)** > **Ontkoppelen**.
+- Ontkoppelen kan per agenda bij **Gezin** > **Agenda's (WeekCal)** > **Ontkoppelen**.
