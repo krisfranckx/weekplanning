@@ -224,6 +224,19 @@
       return { adres: c.url.replace(/\/+$/, '') + '/rest/v1/rpc/todo_via_siri', apikey: c.sleutel, sleutel: data };
     },
 
+    /** Een functie in Supabase aanroepen (alleen als je ingelogd bent). */
+    async rpc(naam, args) {
+      if (!client || !gebruiker) throw new Error('Log eerst in om te delen');
+      const { data, error } = await client.rpc(naam, args || {});
+      if (error) {
+        if (/function|schema cache/i.test(error.message || '') && (error.message || '').includes(naam)) {
+          throw new Error('Voer eerst het bijgewerkte supabase/opzet.sql opnieuw uit in Supabase');
+        }
+        throw new Error(error.message || 'Er ging iets mis');
+      }
+      return data;
+    },
+
     /** Na elke lokale wijziging aanroepen. */
     gewijzigd() {
       if (!config()) return;

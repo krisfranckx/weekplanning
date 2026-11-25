@@ -171,3 +171,90 @@ revoke all on function public.maak_siri_sleutel() from public, anon;
 grant execute on function public.maak_siri_sleutel() to authenticated;
 revoke all on function public.todo_via_siri(text, text, text, text) from public;
 grant execute on function public.todo_via_siri(text, text, text, text) to anon, authenticated;
+
+-- 8. Agenda uit WeekCal / iCloud / Google inlezen (alleen lezen)
+-- Eén agenda-link (ICS/webcal) voor het hele gezin. Supabase haalt de agenda op, omdat een
+-- browser iCloud of Google meestal niet rechtstreeks mag lezen. De link zelf is alleen
+-- via de functies hieronder te zien of te wijzigen, en alleen door toegelaten gebruikers.
+create extension if not exists http with schema extensions;
+
+create table if not exists public.agenda_link (
+  id integer primary key default 1 check (id = 1),
+  url text not null,
+  gewijzigd timestamptz not null default now(),
+  gewijzigd_door text
+);
+alter table public.agenda_link enable row level security;
+revoke all on public.agenda_link from anon, authenticated;
+
+-- Link instellen (leeg = verwijderen). webcal:// wordt https://.
+create or replace function public.zet_agenda_link(url text)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  schoon text := trim(coalesce(url, ''));
+begin
+  if not public.is_toegelaten() then
+    raise exception 'Geen toegang' using errcode = '42501';
+  end if;
+  if schoon = '' then
+    delete from public.agenda_link where id = 1;
+    return null;
+  end if;
+  schoon := regexp_replace(schoon, '^webcals?://', 'https://', 'i');
+  if schoon !~* '^https://[^/\s]+\.[^/\s]+/\S*$' then
+    raise exception 'Dat lijkt geen agenda-link: hij moet beginnen met webcal:// of https://' using errcode = '22023';
+  end if;
+  insert into public.agenda_link (id, url, gewijzigd, gewijzigd_door)
+  values (1, schoon, now(), lower(trim(coalesce(auth.jwt() ->> 'email', ''))))
+  on conflict (id) do update set url = excluded.url, gewijzigd = now(), gewijzigd_door = excluded.gewijzigd_door;
+  return substring(schoon from '^https://([^/]+)');
+end;
+$$;
+
+-- De agenda ophalen. Geeft { ingesteld, bron, ics } of { ingesteld, bron, fout }.
+create or replace function public.agenda_ophalen()
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  link text;
+  antwoord extensions.http_response;
+  bron text;
+begin
+  if not public.is_toegelaten() then
+    raise exception 'Geen toegang' using errcode = '42501';
+  end if;
+  select a.url into link from public.agenda_link a where a.id = 1;
+  if link is null then
+    return jsonb_build_object('ingesteld', false);
+  end if;
+  bron := substring(link from '^https://([^/]+)');
+  begin
+    perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MS', '15000');
+    antwoord := extensions.http_get(link);
+  exception when others then
+    return jsonb_build_object('ingesteld', true, 'bron', bron, 'fout', 'De agenda was niet bereikbaar: ' || sqlerrm);
+  end;
+  if antwoord.status <> 200 then
+    return jsonb_build_object('ingesteld', true, 'bron', bron,
+      'fout', 'De agenda gaf foutcode ' || antwoord.status || '. Klopt de link nog, en staat de agenda nog gedeeld?');
+  end if;
+  if position('BEGIN:VCALENDAR' in coalesce(antwoord.content, '')) = 0 then
+    return jsonb_build_object('ingesteld', true, 'bron', bron, 'fout', 'Op die link staat geen agenda (ICS).');
+  end if;
+  return jsonb_build_object('ingesteld', true, 'bron', bron, 'ics', antwoord.content);
+end;
+$$;
+
+revoke all on function public.zet_agenda_link(text) from public, anon;
+grant execute on function public.zet_agenda_link(text) to authenticated;
+revoke all on function public.agenda_ophalen() from public, anon;
+grant execute on function public.agenda_ophalen() to authenticated;

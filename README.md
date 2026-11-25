@@ -59,6 +59,7 @@ De tests (Node, ingebouwde testrunner) controleren de planningslogica in `js/log
 | `css/stijl.css` | Opmaak (licht en donker thema) |
 | `js/logica.js` | Datums, standaardweek en aanpassingen per dag (zonder schermcode, testbaar) |
 | `js/app.js` | Schermen en bediening |
+| `js/agenda.js` | Agenda (ICS) lezen en herhalingen uitrekenen, voor de afspraken uit WeekCal |
 | `js/sync.js` | Live delen via Supabase (inloggen, versturen, live updates, offline wachtrij) |
 | `supabase/opzet.sql` | Tabellen en beveiliging voor Supabase |
 | `sw.js`, `manifest.webmanifest`, `icoon.svg` | Installeren op het beginscherm en offline werken |
@@ -71,6 +72,11 @@ Zonder Supabase werkt de app gewoon lokaal op één toestel.
 ## Todo's toevoegen met Siri
 
 "Hé Siri, ik heb een nieuwe todo": zie [SIRI.md](SIRI.md). Werkt ook via CarPlay.
+
+## Afspraken uit WeekCal
+
+Afspraken uit één gedeelde agenda (bv. een iCloud-agenda *Gezin* die je in WeekCal gebruikt)
+verschijnen als activiteit, alleen lezen. Zie [AGENDA.md](AGENDA.md).
 
 ## Online zetten
 
