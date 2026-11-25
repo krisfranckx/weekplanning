@@ -610,3 +610,19 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .school-rij.getint .school-tijd { margin-left: auto; text-align: right; }
 .school-rij.leeg { background: var(--veld); }
 .school-rij.leeg .school-wie { color: var(--grijs-licht); font-style: italic; font-weight: 500; text-align: right; }
+
+/* ---------- Thuis/kantoor en brengen/ophalen: compact en allemaal even hoog ---------- */
+:root { --rij-hoogte: 40px; }
+.werkbalk { gap: 6px; }
+.kaart.werk {
+  min-height: 0; height: var(--rij-hoogte); padding: 0 12px; border-radius: 12px;
+  flex-direction: row; align-items: center; justify-content: flex-start;
+}
+.werk-plek { font-size: .88rem; font-weight: 650; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.werk-plek .ic { width: 16px; height: 16px; flex: none; }
+.werk-leeg .werk-plek { font-size: .85rem; }
+.school-kaart { padding: 0; gap: 6px; background: none; border: none; box-shadow: none; }
+.school-rij { min-height: 0; height: var(--rij-hoogte); padding: 0 12px; gap: 8px; border-radius: 12px; }
+.school-ic .ic { width: 16px; height: 16px; }
+.school-label { font-size: .85rem; }
+.school-tijd, .school-wie { font-size: .85rem; }
