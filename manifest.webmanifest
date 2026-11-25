@@ -1,0 +1,14 @@
+{
+  "name": "Weekplanning",
+  "short_name": "Weekplanning",
+  "description": "Wie brengt, wie haalt, wat eten we vandaag?",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#2e86ab",
+  "icons": [
+    { "src": "icoon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

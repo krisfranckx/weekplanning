@@ -44,11 +44,24 @@ De tests (Node, ingebouwde testrunner) controleren de planningslogica in `js/log
 | `css/stijl.css` | Opmaak (licht en donker thema) |
 | `js/logica.js` | Datums, standaardweek en aanpassingen per dag (zonder schermcode, testbaar) |
 | `js/app.js` | Schermen en bediening |
+| `js/sync.js` | Live delen via Supabase (inloggen, versturen, live updates, offline wachtrij) |
+| `supabase/opzet.sql` | Tabellen en beveiliging voor Supabase |
 | `sw.js`, `manifest.webmanifest`, `icoon.svg` | Installeren op het beginscherm en offline werken |
+
+## Live delen met je partner
+
+Optioneel, via een gratis Supabase-project. Volg het stappenplan in [DELEN.md](DELEN.md).
+Zonder Supabase werkt de app gewoon lokaal op één toestel.
+
+## Online zetten
+
+De app kan op GitHub Pages: *Settings* > *Pages* > *Deploy from a branch*, map `/ (root)`.
+Het adres wordt dan `https://krisfranckx.github.io/weekplanning/`.
 
 ## Hoe de planning bewaard wordt
 
-Alles staat in de browser van het toestel (`localStorage`):
+Alles staat in de browser van het toestel (`localStorage`), en met Supabase ook als één
+JSON-document in de tabel `planning`:
 
 - een **standaardweek** (maandag tot zondag),
 - **aanpassingen per datum** die de standaardweek voor die ene dag overschrijven,
