@@ -217,6 +217,9 @@ button.kaart:active { transform: scale(.985); }
 .act-wie { display: block; margin-top: 4px; }
 /* Dagweergave: één lijn per activiteit, + rechtsboven zonder kop */
 .acts-kaart { position: relative; }
+.wis-vraag { color: var(--grijs); font-size: .88rem; }
+.tot-veld[hidden] { display: none; }
+.chip .klein-grijs { margin: 0; font-size: .78rem; }
 .acts-kaart .plus.hoek { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; }
 .acts-kaart > .activiteiten, .acts-kaart > .leeg-tekst { padding-right: 40px; }
 .acts-kaart > .leeg-tekst { padding-top: 6px; padding-bottom: 6px; }
