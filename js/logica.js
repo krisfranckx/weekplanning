@@ -84,6 +84,14 @@
     };
   }
 
+  /** Een eerste lijst gerechten; zelf toegevoegde komen er automatisch bij. */
+  const STANDAARD_GERECHTEN = [
+    'Balletjes in tomatensaus', 'Croques', 'Frietjes met frikandel', 'Kip met appelmoes',
+    'Lasagne', 'Pannenkoeken', 'Pasta pesto', 'Pizza', 'Soep met boterhammen',
+    'Spaghetti bolognese', 'Stoemp met worst', 'Stoofvlees met frieten',
+    'Vis met puree', "Vol-au-vent", 'Wraps', 'Restjesdag'
+  ];
+
   /** Startdata van ons gezin. Namen pas je aan bij "Gezin". */
   const STANDAARD_LEDEN = [
     { id: 'ouder1', naam: 'Kris', rol: 'ouder', kleur: KLEUREN[0] },
@@ -107,7 +115,7 @@
       }
       week.push(dag);
     }
-    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {} };
+    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice() };
   }
 
   /** Vult ontbrekende velden aan, zodat oudere of geïmporteerde data blijft werken. */
@@ -121,6 +129,9 @@
       aanpassingen: data.aanpassingen && typeof data.aanpassingen === 'object' ? data.aanpassingen : {}
     };
     vervangOudeNamen(uit.leden);
+    uit.gerechten = Array.isArray(data.gerechten)
+      ? data.gerechten.filter(g => typeof g === 'string')
+      : STANDAARD_GERECHTEN.slice();
     for (let i = 0; i < 7; i++) {
       const bron = (Array.isArray(data.week) && data.week[i]) || {};
       const leeg = leegDagpatroon(i);
@@ -132,6 +143,9 @@
         activiteiten: Array.isArray(bron.activiteiten) ? bron.activiteiten : []
       });
     }
+    // Gerechten die al in de planning staan, horen ook in de lijst.
+    uit.week.forEach(d => voegGerechtToe(uit, d.eten.wat));
+    Object.values(uit.aanpassingen).forEach(a => { if (a && a.eten) voegGerechtToe(uit, a.eten.wat); });
     return uit;
   }
 
@@ -375,13 +389,45 @@
     return Object.keys(uit).length ? uit : null;
   }
 
+  // ---------- Gerechten ----------
+
+  function zoekGerecht(data, naam) {
+    const n = String(naam || '').trim().toLowerCase();
+    return (data.gerechten || []).find(g => g.toLowerCase() === n) || null;
+  }
+
+  /** Voegt een gerecht toe (zonder dubbels, hoofdletters maken niet uit). Geeft true als het nieuw was. */
+  function voegGerechtToe(data, naam) {
+    naam = String(naam || '').trim().replace(/\s+/g, ' ');
+    if (!naam || naam.length > 80) return false;
+    if (!data.gerechten) data.gerechten = [];
+    if (zoekGerecht(data, naam)) return false;
+    data.gerechten.push(naam);
+    data.gerechten.sort((a, b) => a.localeCompare(b, 'nl'));
+    return true;
+  }
+
+  function verwijderGerecht(data, naam) {
+    const n = String(naam || '').trim().toLowerCase();
+    data.gerechten = (data.gerechten || []).filter(g => g.toLowerCase() !== n);
+  }
+
+  /** Gerechten gesorteerd, eventueel gefilterd op een zoekterm. */
+  function gerechtenLijst(data, zoek) {
+    const z = String(zoek || '').trim().toLowerCase();
+    return (data.gerechten || []).slice()
+      .sort((a, b) => a.localeCompare(b, 'nl'))
+      .filter(g => !z || g.toLowerCase().includes(z));
+  }
+
   const Logica = {
     DAGEN, DAGEN_KORT, MAANDEN, KLEUREN, DAGVELDEN,
     weekdagIndex, datumSleutel, vanSleutel, plusDagen, maandagVan, zelfdeDag,
     datumLang, datumKort, weekNummer,
     maakId, standaardData, normaliseer, dagPlan,
     zetVeld, herstelVeld, bewaarActiviteit, verwijderActiviteit, herstelActiviteit,
-    ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink
+    ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
+    voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Logica;

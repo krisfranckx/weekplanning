@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '3 (25 nov 2026)';
+  const APP_VERSIE = '4 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -286,7 +286,7 @@
           '</div>';
       }
       html += '<div class="sw-raster">' +
-        '<label class="breed">🍝 Avondeten<input type="text" name="eten.wat" placeholder="bv. Spaghetti" value="' + e(dag.eten.wat) + '"></label>' +
+        '<label class="breed">🍝 Avondeten<input type="text" name="eten.wat" list="gerechten-lijst" placeholder="Kies of typ een gerecht" value="' + e(dag.eten.wat) + '"></label>' +
         '<label>Kookt' + persoonKeuze('eten.kok', dag.eten.kok) + '</label>' +
         '</div>';
       html += '<div class="sw-acts">' + dag.activiteiten.map(a =>
@@ -296,6 +296,7 @@
       html += '</section>';
     }
     html += '</div>';
+    html += '<datalist id="gerechten-lijst">' + L.gerechtenLijst(staat.data).map(g => '<option value="' + e(g) + '">').join('') + '</datalist>';
     return html;
   }
 
@@ -318,8 +319,14 @@
     }
     let waarde = doel.value;
     if (sub === 'wie' || sub === 'kok') waarde = waarde || null;
+    if (sub === 'wat') waarde = waarde.trim();
     dag[veld][sub] = waarde;
-    bewaar('Opgeslagen voor elke ' + L.DAGEN[i]);
+    const nieuw = sub === 'wat' && L.voegGerechtToe(staat.data, waarde);
+    bewaar('Opgeslagen voor elke ' + L.DAGEN[i] + (nieuw ? '. ' + waarde + ' staat nu in de gerechtenlijst' : ''));
+    if (nieuw) {
+      const lijst = inhoud.querySelector('#gerechten-lijst');
+      if (lijst) lijst.innerHTML = L.gerechtenLijst(staat.data).map(g => '<option value="' + e(g) + '">').join('');
+    }
   }
 
   // ---------- Gezin ----------
@@ -337,6 +344,14 @@
         '</li>').join('') + '</ul>' +
       '<button class="knop secundair" data-actie="nieuw-lid">＋ Persoon toevoegen</button>' +
       '<p class="uitleg">Voeg ook grootouders, de oppas of de naschoolse opvang toe als zij soms brengen of halen.</p></section>';
+
+    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">🍽️</span><h2>Gerechten</h2></div>' +
+      '<p class="uitleg">Hieruit kies je bij het avondeten. Een nieuw gerecht dat je daar typt, komt er vanzelf bij.</p>' +
+      '<div class="chips gerechtenbeheer">' + L.gerechtenLijst(staat.data).map(g =>
+        '<span class="chip">' + e(g) + '<button class="chip-wis" data-actie="wis-gerecht" data-gerecht="' + e(g) +
+        '" aria-label="' + e(g) + ' verwijderen">×</button></span>').join('') + '</div>' +
+      '<form id="gerecht-toevoegen" class="rij-toevoegen"><input type="text" name="gerecht" placeholder="Nieuw gerecht" autocomplete="off" aria-label="Nieuw gerecht">' +
+      '<button class="knop secundair" type="submit">Toevoegen</button></form></section>';
 
     html += deelKaartHtml();
 
@@ -498,6 +513,17 @@
     return html + '</div>';
   }
 
+  /** Gerechten als tikbare knoppen; `zoek` filtert, het gekozen gerecht wordt gemarkeerd. */
+  function gerechtChips(zoek) {
+    const lijst = L.gerechtenLijst(staat.data, zoek);
+    const gekozen = (zoek || '').trim().toLowerCase();
+    if (!lijst.length) {
+      return '<p class="uitleg">Nieuw gerecht. Het komt in de lijst als je opslaat.</p>';
+    }
+    return lijst.map(g => '<button type="button" class="chip gerecht' + (g.toLowerCase() === gekozen ? ' gekozen' : '') +
+      '" data-gerecht="' + e(g) + '">' + e(g) + '</button>').join('');
+  }
+
   function bladKnoppen(extra) {
     return '<div class="blad-knoppen">' + (extra || '') +
       '<button type="button" class="knop secundair" data-blad="annuleer">Annuleren</button>' +
@@ -518,7 +544,8 @@
         '<label class="veld">Tijd<input type="time" name="tijd" value="' + e(plan[veld].tijd) + '"></label>';
     } else if (veld === 'eten') {
       html = '<h2>🍝 Avondeten</h2>' +
-        '<label class="veld">Wat eten we?<input type="text" name="wat" value="' + e(plan.eten.wat) + '" placeholder="bv. Stoemp met worst" autocomplete="off"></label>' +
+        '<label class="veld">Wat eten we?<input type="text" name="wat" value="' + e(plan.eten.wat) + '" placeholder="Kies hieronder of typ een nieuw gerecht" autocomplete="off"></label>' +
+        '<div class="gerecht-keuze" id="gerecht-keuze">' + gerechtChips('') + '</div>' +
         '<p class="veld-label">Wie kookt?</p>' + persoonChips('kok', plan.eten.kok, false, true);
     } else if (veld === 'school') {
       html = '<h2>📚 School</h2>' +
@@ -542,7 +569,9 @@
       else waarde = f.get('school') === 'ja';
       const bereik = f.get('bereik');
       L.zetVeld(staat.data, datum, veld, waarde, bereik);
-      bewaar(bereik === 'week' ? 'Opgeslagen voor elke ' + weekdagNaam(datum) : 'Opgeslagen voor ' + L.datumKort(datum));
+      const nieuwGerecht = veld === 'eten' && L.voegGerechtToe(staat.data, waarde.wat);
+      bewaar((bereik === 'week' ? 'Opgeslagen voor elke ' + weekdagNaam(datum) : 'Opgeslagen voor ' + L.datumKort(datum)) +
+        (nieuwGerecht ? '. ' + waarde.wat + ' staat nu in de gerechtenlijst' : ''));
     });
   }
 
@@ -598,7 +627,20 @@
     teken();
   });
 
+  bladForm.addEventListener('input', ev => {
+    if (ev.target.name !== 'wat') return;
+    const doos = bladForm.querySelector('#gerecht-keuze');
+    if (doos) doos.innerHTML = gerechtChips(ev.target.value);
+  });
+
   bladForm.addEventListener('click', ev => {
+    const gerecht = ev.target.closest('[data-gerecht]');
+    if (gerecht) {
+      const veld = bladForm.querySelector('input[name=wat]');
+      veld.value = gerecht.dataset.gerecht;
+      bladForm.querySelector('#gerecht-keuze').innerHTML = gerechtChips(veld.value);
+      return;
+    }
     const knop = ev.target.closest('[data-blad]');
     if (!knop) return;
     const soort = knop.dataset.blad;
@@ -705,6 +747,11 @@
       case 'exporteer':
         exporteer();
         break;
+      case 'wis-gerecht':
+        L.verwijderGerecht(d, knop.dataset.gerecht);
+        bewaar(knop.dataset.gerecht + ' verwijderd uit de lijst');
+        teken();
+        break;
       case 'deel-link':
         kopieerKoppelLink();
         break;
@@ -728,6 +775,16 @@
 
   inhoud.addEventListener('submit', ev => {
     ev.preventDefault();
+    if (ev.target.id === 'gerecht-toevoegen') {
+      const naam = (new FormData(ev.target).get('gerecht') || '').trim();
+      if (naam) {
+        bewaar(L.voegGerechtToe(staat.data, naam) ? naam + ' toegevoegd' : naam + ' staat al in de lijst');
+        teken();
+        const veld = inhoud.querySelector('#gerecht-toevoegen input');
+        if (veld) veld.focus();
+      }
+      return;
+    }
     const knop = ev.submitter;
     deelFormulier(ev.target, knop ? knop.value : '');
   });

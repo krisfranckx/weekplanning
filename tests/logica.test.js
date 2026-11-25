@@ -124,3 +124,24 @@ test('oude standaardnamen worden vervangen, aangepaste niet', () => {
   const zelfGedaan = { leden: oud.leden.map((l, i) => Object.assign({}, l, { naam: 'X' + i })), week: [] };
   assert.deepEqual(L.normaliseer(zelfGedaan).leden.map(l => l.naam), ['X0', 'X1', 'X2', 'X3']);
 });
+
+test('gerechtenlijst: standaard, zelf toevoegen zonder dubbels, verwijderen', () => {
+  const d = L.standaardData();
+  assert.ok(d.gerechten.includes('Spaghetti bolognese'));
+  assert.equal(L.voegGerechtToe(d, '  Curry   met rijst '), true);
+  assert.ok(d.gerechten.includes('Curry met rijst'));
+  assert.equal(L.voegGerechtToe(d, 'curry met rijst'), false);
+  assert.equal(L.voegGerechtToe(d, ''), false);
+  assert.deepEqual(L.gerechtenLijst(d, 'curry'), ['Curry met rijst']);
+  L.verwijderGerecht(d, 'CURRY MET RIJST');
+  assert.equal(L.zoekGerecht(d, 'Curry met rijst'), null);
+});
+
+test('normaliseer: oude data krijgt gerechtenlijst met gerechten uit de planning', () => {
+  const d = L.normaliseer({ week: [{ eten: { wat: 'Witloof in de oven' } }], aanpassingen: { '2026-11-25': { eten: { wat: 'Sushi', kok: null } } } });
+  assert.ok(d.gerechten.includes('Witloof in de oven'));
+  assert.ok(d.gerechten.includes('Sushi'));
+  assert.ok(d.gerechten.includes('Pizza'));
+  const eigen = L.normaliseer({ gerechten: ['Alleen dit'], week: [] });
+  assert.deepEqual(eigen.gerechten, ['Alleen dit']);
+});
