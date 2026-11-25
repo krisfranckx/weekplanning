@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '15 (25 nov 2026)';
+  const APP_VERSIE = '16 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -352,7 +352,7 @@
           '<span class="tijd">' + (a.heleDag ? '<span class="hele-dag">hele dag</span>' : e(a.tijd)) + '</span>' +
           '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
           '<span class="act-wie">' + personen(a.wie) +
-          '<span class="agenda-label">' + ic('kalender', 'mini') + 'Agenda' + (a.plaats ? ' · ' + e(a.plaats) : '') + '</span></span></span></button></li>'
+          '<span class="agenda-label" title="Uit je agenda">' + ic('kalender', 'mini') + (a.plaats ? e(a.plaats) : '') + '</span></span></span></button></li>'
         : '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
           '<span class="tijd">' + e(a.tijd || '–') + '</span>' +
           '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
