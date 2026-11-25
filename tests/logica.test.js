@@ -190,6 +190,8 @@ test("todo's: toevoegen, afvinken, tonen op dag en in groepen", () => {
 
   L.zetTodoKlaar(d, t2.id, true);
   assert.deepEqual(L.todosVoorDag(d, woensdag, woensdag).map(t => t.titel), ['Turnzak wassen']);
+  // Afgevinkt: ook niet meer op de eigen dag
+  assert.deepEqual(L.todosVoorDag(d, new Date(2026, 10, 20), woensdag).map(t => t.titel), []);
   const g = L.todoGroepen(d, woensdag);
   assert.deepEqual(Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v.map(t => t.titel)])), {
     telaat: [], vandaag: ['Turnzak wassen'], week: ['Cadeau kopen'], later: ['Volgende maand'],

@@ -544,8 +544,9 @@
   function todosVoorDag(data, datum, vandaag) {
     const s = datumSleutel(datum);
     const isVandaag = vandaag && datumSleutel(vandaag) === s;
-    const uit = (data.todos || []).filter(t =>
-      t.deadline === s || (isVandaag && !t.klaar && t.deadline && t.deadline < s));
+    // Afgevinkte todo's niet in de dag- en weekweergave (wel in het tabblad Todo's, onder Afgevinkt).
+    const uit = (data.todos || []).filter(t => !t.klaar &&
+      (t.deadline === s || (isVandaag && t.deadline && t.deadline < s)));
     return sorteerTodos(uit).map(t => Object.assign({}, t, { telaat: t.deadline < s }));
   }
 
