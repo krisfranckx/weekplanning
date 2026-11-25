@@ -116,7 +116,7 @@
       }
       week.push(dag);
     }
-    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [] };
+    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [], agendaWie: {} };
   }
 
   /** Vult ontbrekende velden aan, zodat oudere of geïmporteerde data blijft werken. */
@@ -139,6 +139,12 @@
         wie: t.wie || null, klaar: !!t.klaar
       }))
       : [];
+    uit.agendaWie = {};
+    if (data.agendaWie && typeof data.agendaWie === 'object') {
+      Object.keys(data.agendaWie).forEach(k => {
+        if (Array.isArray(data.agendaWie[k])) uit.agendaWie[k] = data.agendaWie[k].filter(x => typeof x === 'string');
+      });
+    }
     for (let i = 0; i < 7; i++) {
       const bron = (Array.isArray(data.week) && data.week[i]) || {};
       const leeg = leegDagpatroon(i);
@@ -342,6 +348,11 @@
     Object.keys(data.aanpassingen).forEach(s => {
       if (s < grens) delete data.aanpassingen[s];
     });
+    // Personen bij één keer van een agenda-afspraak (sleutel "uid|JJJJ-MM-DD")
+    Object.keys(data.agendaWie || {}).forEach(k => {
+      const datum = k.split('|')[1];
+      if (datum && datum < grens) delete data.agendaWie[k];
+    });
   }
 
   function lid(data, id) {
@@ -364,6 +375,42 @@
     Object.values(data.aanpassingen).forEach(wis);
     Object.keys(data.aanpassingen).forEach(k => ruimLegeAanpassingOp(data, k));
     (data.todos || []).forEach(t => { if (t.wie === id) t.wie = null; });
+    Object.keys(data.agendaWie || {}).forEach(k => { data.agendaWie[k] = data.agendaWie[k].filter(x => x !== id); });
+  }
+
+  /* ---------- Personen bij afspraken uit de agenda ---------- */
+  // data.agendaWie: { uid: [lid-ids] } geldt voor elke keer van een (herhalende) afspraak,
+  // { 'uid|JJJJ-MM-DD': [lid-ids] } alleen voor die ene keer. Een lege lijst = bewust niemand.
+
+  /** Gekozen personen, of null als er niets gekozen is (dan herkent de app namen in de titel). */
+  function agendaWieVoor(data, uid, datum) {
+    const lijst = data.agendaWie || {};
+    const dag = lijst[uid + '|' + datum];
+    if (dag) return dag.slice();
+    return lijst[uid] ? lijst[uid].slice() : null;
+  }
+
+  /** bereik 'reeks' = elke keer, 'dag' = alleen op deze datum. */
+  function zetAgendaWie(data, uid, datum, wie, bereik) {
+    if (!uid) return;
+    data.agendaWie = data.agendaWie || {};
+    const lijst = (wie || []).filter(Boolean);
+    if (bereik === 'dag') {
+      data.agendaWie[uid + '|' + datum] = lijst;
+    } else {
+      data.agendaWie[uid] = lijst;
+      delete data.agendaWie[uid + '|' + datum];
+    }
+  }
+
+  /** Terug naar automatisch (namen in de titel), voor deze keer of voor de hele reeks. */
+  function wisAgendaWie(data, uid, datum, bereik) {
+    if (!data.agendaWie) return;
+    delete data.agendaWie[uid + '|' + datum];
+    if (bereik !== 'dag') {
+      delete data.agendaWie[uid];
+      Object.keys(data.agendaWie).forEach(k => { if (k.startsWith(uid + '|')) delete data.agendaWie[k]; });
+    }
   }
 
   /* ---------- Thuis of op kantoor ---------- */
@@ -614,6 +661,7 @@
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
     verschillen, voegWijzigingenToe,
     WERKPLEKKEN, zetWerk, herstelWerk,
+    agendaWieVoor, zetAgendaWie, wisAgendaWie,
     bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };
 

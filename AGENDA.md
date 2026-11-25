@@ -48,8 +48,10 @@ gezin: je partner hoeft niets in te stellen.
 - De app haalt de agenda op als je ze opent, en daarna hoogstens om het kwartier. iCloud werkt
   een openbare agenda zelf ook maar om de paar minuten bij, dus een nieuwe afspraak kan even
   op zich laten wachten. Met **Nu vernieuwen** haal je ze meteen op.
-- Staat de naam van een gezinslid als los woord in de titel (bv. *Voetbal Pablo*), dan toont de
-  app die persoon erbij.
+- **Voor wie?** Tik in de app op een afspraak en kies de personen. Bij een herhalende afspraak
+  kies je *Elke keer* of *Alleen* die ene dag. Die keuze wordt gedeeld, dus Eva ziet ze ook.
+  Kies je niets, dan herkent de app een gezinslid waarvan de naam als los woord in de titel staat
+  (bv. *Voetbal Pablo*).
 - Afspraken van de voorbije twee weken tot een half jaar vooruit worden getoond. Herhalende
   afspraken (wekelijks, om de twee weken, maandelijks, …) en hele-dag-afspraken werken ook.
 - De afspraken staan op elk toestel apart in het geheugen, zodat je ze ook offline ziet.

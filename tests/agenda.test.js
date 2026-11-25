@@ -77,3 +77,33 @@ test('gezinsleden herkennen in de titel', () => {
   assert.deepStrictEqual(A.ledenInTitel('Voetbal Pablo + Louis', leden), ['p', 'l']);
   assert.deepStrictEqual(A.ledenInTitel('Evaluatie', leden), []);
 });
+
+test('personen kiezen bij een afspraak: elke keer, één keer, automatisch', () => {
+  const L = require('../js/logica.js');
+  const data = L.standaardData();
+  const lijst = A.leesIcs(ics([ev(['UID:zw', 'DTSTART;TZID=Europe/Brussels:20261104T170000', 'RRULE:FREQ=WEEKLY', 'SUMMARY:Zwemmen'])]));
+  const dagen = A.perDag(lijst, d('2026-11-25'), d('2026-12-02'));
+  const item = dagen['2026-11-25'][0];
+  assert.strictEqual(item.uid, 'zw');
+  assert.strictEqual(item.herhaalt, true);
+  assert.strictEqual(L.agendaWieVoor(data, 'zw', '2026-11-25'), null);
+
+  L.zetAgendaWie(data, 'zw', '2026-11-25', ['kind2'], 'reeks');
+  assert.deepStrictEqual(L.agendaWieVoor(data, 'zw', '2026-12-02'), ['kind2']);
+  L.zetAgendaWie(data, 'zw', '2026-12-02', ['kind3'], 'dag');
+  assert.deepStrictEqual(L.agendaWieVoor(data, 'zw', '2026-12-02'), ['kind3']);
+  assert.deepStrictEqual(L.agendaWieVoor(data, 'zw', '2026-12-09'), ['kind2']);
+
+  // Blijft bewaard na normaliseren (export/import, delen)
+  const terug = L.normaliseer(JSON.parse(JSON.stringify(data)));
+  assert.deepStrictEqual(terug.agendaWie, data.agendaWie);
+
+  // Lid verwijderen haalt het overal weg; oude losse keren worden opgeruimd
+  L.verwijderLid(terug, 'kind3');
+  assert.deepStrictEqual(L.agendaWieVoor(terug, 'zw', '2026-12-02'), []);
+  L.ruimOudeAanpassingenOp(terug, d('2027-03-01'), 60);
+  assert.deepStrictEqual(L.agendaWieVoor(terug, 'zw', '2026-12-02'), ['kind2']);
+
+  L.wisAgendaWie(terug, 'zw', '2026-12-02', 'reeks');
+  assert.strictEqual(L.agendaWieVoor(terug, 'zw', '2026-12-02'), null);
+});
