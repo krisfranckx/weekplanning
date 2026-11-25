@@ -316,3 +316,5 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .chip-wis { border: none; background: none; color: var(--grijs); font-size: 1.1rem; line-height: 1; padding: 2px 6px; min-width: 28px; min-height: 28px; }
 .rij-toevoegen { display: flex; gap: 8px; }
 .rij-toevoegen input { flex: 1; }
+.handmatig { margin-top: 10px; }
+.handmatig summary { color: var(--accent); cursor: pointer; padding: 6px 0; }

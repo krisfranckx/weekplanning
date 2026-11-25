@@ -285,12 +285,24 @@
 
     /** Leest een koppel-link uit het adres. Geeft true als er iets ingesteld werd. */
     leesKoppelLink() {
-      const m = location.hash.match(/koppel=([^&]+)/);
-      if (!m) return false;
+      if (!/koppel=/.test(location.hash)) return false;
+      const ok = Sync.koppelVanTekst(location.hash);
+      if (ok) history.replaceState(null, '', location.pathname + location.search);
+      return ok;
+    },
+
+    /**
+     * Koppel-link (of alleen de code) die geplakt werd, bv. in de app op het beginscherm.
+     * Die app heeft op iPhone eigen opslag en kan geen link openen, dus plakken is de weg.
+     */
+    koppelVanTekst(tekst) {
+      tekst = String(tekst || '').trim();
+      const m = tekst.match(/koppel=([^&\s]+)/);
+      const code = m ? m[1] : tekst;
       try {
-        const c = JSON.parse(atob(decodeURIComponent(m[1])));
+        const c = JSON.parse(atob(decodeURIComponent(code)));
+        if (!c || !c.u || !c.k) return false;
         Sync.zetConfig(c.u, c.k);
-        history.replaceState(null, '', location.pathname + location.search);
         return true;
       } catch (e) {
         return false;
