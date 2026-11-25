@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '6 (25 nov 2026)';
+  const APP_VERSIE = '7 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -286,8 +286,11 @@
           '</div>';
       }
       html += '<div class="sw-raster">' +
-        '<label class="breed">🍝 Avondeten<input type="text" name="eten.wat" list="gerechten-lijst" placeholder="Kies of typ een gerecht" value="' + e(dag.eten.wat) + '"></label>' +
-        '<label>Kookt' + persoonKeuze('eten.kok', dag.eten.kok) + '</label>' +
+        '<button type="button" class="eten-knop breed" data-actie="bewerk-std-eten" data-weekdag="' + i + '">' +
+        '<span class="klein-grijs">🍝 Avondeten</span>' +
+        '<span class="eten-wat">' + (dag.eten.wat ? e(dag.eten.wat) : '<span class="leeg-tekst">Kies een gerecht</span>') + '</span>' +
+        (dag.eten.kok ? '<span class="klein-grijs">Kookt: ' + persoon(dag.eten.kok) + '</span>' : '') +
+        '</button>' +
         '</div>';
       html += '<div class="sw-acts">' + dag.activiteiten.map(a =>
         '<button class="chip" data-actie="bewerk-vaste-activiteit" data-weekdag="' + i + '" data-id="' + e(a.id) + '">' +
@@ -296,7 +299,6 @@
       html += '</section>';
     }
     html += '</div>';
-    html += '<datalist id="gerechten-lijst">' + L.gerechtenLijst(staat.data).map(g => '<option value="' + e(g) + '">').join('') + '</datalist>';
     return html;
   }
 
@@ -537,9 +539,15 @@
       '<button type="submit" class="knop" value="ok">Opslaan</button></div>';
   }
 
-  function bewerkVeld(veld) {
-    const datum = staat.datum;
-    const plan = L.dagPlan(staat.data, datum);
+  /**
+   * Een veld bewerken. Met `weekdag` (0-6) bewerk je de standaardweek: altijd "elke week".
+   */
+  function bewerkVeld(veld, weekdag) {
+    const alleenWeek = typeof weekdag === 'number';
+    const datum = alleenWeek ? datumVoorWeekdag(weekdag) : staat.datum;
+    const plan = alleenWeek
+      ? Object.assign(JSON.parse(JSON.stringify(staat.data.week[weekdag])), { aangepast: {} })
+      : L.dagPlan(staat.data, datum);
     const aangepast = !!plan.aangepast[veld];
     const herstel = aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '';
     let html;
@@ -561,7 +569,9 @@
         '<label class="chip-keuze"><input type="radio" name="school" value="nee"' + (!plan.school ? ' checked' : '') + '><span>Geen school</span></label>' +
         '</div>';
     }
-    html += bereikKeuze(datum, 'dag') + herstel + bladKnoppen();
+    html += (alleenWeek
+      ? '<input type="hidden" name="bereik" value="week"><p class="uitleg">Geldt voor elke ' + weekdagNaam(datum) + '.</p>'
+      : bereikKeuze(datum, 'dag')) + herstel + bladKnoppen();
 
     openBlad(html, (form, knop) => {
       if (knop === 'herstel') {
@@ -575,7 +585,8 @@
       else if (veld === 'eten') waarde = { wat: (f.get('wat') || '').trim(), kok: f.get('kok') || null };
       else waarde = f.get('school') === 'ja';
       const bereik = f.get('bereik');
-      L.zetVeld(staat.data, datum, veld, waarde, bereik);
+      if (alleenWeek) staat.data.week[weekdag][veld] = waarde; // dagaanpassingen niet aanraken
+      else L.zetVeld(staat.data, datum, veld, waarde, bereik);
       const nieuwGerecht = veld === 'eten' && L.voegGerechtToe(staat.data, waarde.wat);
       bewaar((bereik === 'week' ? 'Opgeslagen voor elke ' + weekdagNaam(datum) : 'Opgeslagen voor ' + L.datumKort(datum)) +
         (nieuwGerecht ? '. ' + waarde.wat + ' staat nu in de gerechtenlijst' : ''));
@@ -699,6 +710,9 @@
         break;
       case 'bewerk':
         bewerkVeld(knop.dataset.veld);
+        break;
+      case 'bewerk-std-eten':
+        bewerkVeld('eten', Number(knop.dataset.weekdag));
         break;
       case 'nieuwe-activiteit':
         bewerkActiviteit(staat.datum, null, false);
