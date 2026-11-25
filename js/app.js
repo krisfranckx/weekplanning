@@ -223,7 +223,8 @@
     if (!isVandaag) {
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
-    html += werkBalkHtml(plan);
+    // Thuis of op kantoor: niet in het weekend
+    if (L.weekdagIndex(staat.datum) < 5) html += werkBalkHtml(plan);
     html += nieuwKaartHtml();
 
     if (plan.school) {
@@ -231,11 +232,6 @@
         schoolRij('brengen', ic('rugzak'), 'Brengen', plan.brengen, plan.aangepast.brengen) +
         schoolRij('halen', ic('school'), 'Ophalen', plan.halen, plan.aangepast.halen) +
         '</section>';
-    } else {
-      html +=
-        '<button class="kaart geen-school" data-actie="bewerk" data-veld="school">' +
-        '<span class="icoon">' + ic('wolk') + '</span><span><strong>Geen school</strong>' +
-        '<small>' + (plan.aangepast.school ? 'Alleen vandaag. ' : '') + 'Tik om te wijzigen</small></span></button>';
     }
 
     // Activiteiten
@@ -272,6 +268,10 @@
       (plan.eten.kok ? '<p class="klein-grijs">Kookt: ' + persoon(plan.eten.kok) + '</p>' : '') +
       '</button>';
 
+    html += plan.school
+      ? '<button class="link midden" data-actie="bewerk" data-veld="school">Geen school vandaag? (vakantie, vrije dag)</button>'
+      : plan.aangepast.school ? '<button class="link midden" data-actie="bewerk" data-veld="school">Toch school op deze dag?</button>' : '';
+
     inhoud.innerHTML = html;
   }
 
@@ -291,7 +291,7 @@
       const w = plan.werk[l.id];
       return '<button class="kaart werk getint' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) +
         '" style="--kleur:' + e(l.kleur) + '" aria-label="' + e(l.naam) + ': ' + e(w ? WERK_TEKST[w] : 'niet ingevuld') + '" title="' + e(l.naam) + '">' +
-        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) : '<span class="werk-vraag">?</span>') +
+        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') +
         (aangepast.includes(l.id) ? '<span class="stipje" title="Alleen deze dag"></span>' : '') + '</span>' +
         '</button>';
     }).join('') + '</div>';
@@ -335,8 +335,6 @@
         '<span class="wd-info">';
       if (plan.school) {
         html += '<span class="wd-regel">' + ic('rugzak', 'mini') + persoon(plan.brengen.wie, '?') + ic('school', 'mini') + persoon(plan.halen.wie, '?') + '</span>';
-      } else {
-        html += '<span class="wd-regel klein-grijs">Geen school</span>';
       }
       if (plan.activiteiten.length) {
         html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
@@ -822,11 +820,7 @@
       ? Object.assign(JSON.parse(JSON.stringify(staat.data.week[weekdag])), { aangepast: {} })
       : L.dagPlan(staat.data, datum);
     const aangepast = !!plan.aangepast[veld];
-    let herstel = aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '';
-    // Vakantie of vrije dag: vanuit brengen/ophalen (er staat geen aparte knop meer op Vandaag)
-    if (!alleenWeek && (veld === 'brengen' || veld === 'halen')) {
-      herstel += '<button type="button" class="link" data-blad="geen-school">Geen school op ' + L.datumKort(datum) + '</button>';
-    }
+    const herstel = aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '';
     let html;
 
     if (veld === 'brengen' || veld === 'halen') {
@@ -854,11 +848,6 @@
       if (knop === 'herstel') {
         L.herstelVeld(staat.data, datum, veld);
         bewaar('Terug zoals in de standaardweek');
-        return;
-      }
-      if (knop === 'geen-school') {
-        L.zetVeld(staat.data, datum, 'school', false, 'dag');
-        bewaar('Geen school op ' + L.datumKort(datum));
         return;
       }
       const f = new FormData(form);
