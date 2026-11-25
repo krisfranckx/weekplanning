@@ -305,3 +305,14 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .deel-form .knoppen { margin-top: 4px; }
 .deelkaart a { color: var(--accent); }
 .midden-tekst { text-align: center; }
+
+/* ---------- Gerechten ---------- */
+
+.gerecht-keuze { display: flex; flex-wrap: wrap; gap: 6px; max-height: 190px; overflow-y: auto; margin: -4px 0 8px; padding: 2px; }
+.chip.gerecht { min-height: 36px; }
+.chip.gerecht.gekozen { border-color: var(--accent); background: var(--accent-zacht); color: var(--accent); font-weight: 600; }
+.gerechtenbeheer { margin-bottom: 10px; }
+.gerechtenbeheer .chip { display: inline-flex; align-items: center; gap: 2px; padding-right: 4px; }
+.chip-wis { border: none; background: none; color: var(--grijs); font-size: 1.1rem; line-height: 1; padding: 2px 6px; min-width: 28px; min-height: 28px; }
+.rij-toevoegen { display: flex; gap: 8px; }
+.rij-toevoegen input { flex: 1; }
