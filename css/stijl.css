@@ -215,11 +215,23 @@ button.kaart:active { transform: scale(.985); }
 .act-tekst { flex: 1; font-weight: 600; }
 .act-tekst .badge { margin-left: 4px; }
 .act-wie { display: block; margin-top: 4px; }
+/* Dagweergave: één lijn per activiteit, + rechtsboven zonder kop */
+.acts-kaart { position: relative; }
+.acts-kaart .plus.hoek { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; }
+.acts-kaart > .activiteiten, .acts-kaart > .leeg-tekst { padding-right: 40px; }
+.acts-kaart > .leeg-tekst { padding-top: 6px; padding-bottom: 6px; }
+.acts-kaart .activiteiten button { align-items: baseline; gap: 10px; }
+.acts-kaart .activiteiten .tijd { width: 3em; }
+.acts-kaart .act-tekst { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.acts-kaart .act-tekst .persoon.klein { margin-right: 0; }
+.acts-kaart .hele-dag { display: inline; }
+.eten.getint .kaart-kop .icoon { color: color-mix(in srgb, var(--kleur) 75%, var(--tekst)); }
 .overgeslagen { margin-top: 8px; font-size: .88rem; color: var(--grijs); }
 /* Afspraken uit de gekoppelde agenda (alleen lezen) */
 .uit-agenda .act-tekst strong { font-weight: 600; }
 .agenda-label { display: inline-flex; align-items: center; font-size: .78rem; font-weight: 500; color: var(--grijs); }
 .act-wie .persoon + .agenda-label { margin-left: 6px; }
+.acts-kaart .agenda-label .ic.mini { margin-right: 2px; }
 .agenda-lijst { list-style: none; margin: 4px 0 8px; padding: 0; }
 .agenda-lijst li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; }
 .agenda-lijst li + li { border-top: 1px solid var(--lijn); }

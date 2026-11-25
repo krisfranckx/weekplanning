@@ -107,3 +107,22 @@ test('personen kiezen bij een afspraak: elke keer, één keer, automatisch', () 
   L.wisAgendaWie(terug, 'zw', '2026-12-02', 'reeks');
   assert.strictEqual(L.agendaWieVoor(terug, 'zw', '2026-12-02'), null);
 });
+
+test('titel en tijd van een agenda-afspraak wijzigen in de app', () => {
+  const L = require('../js/logica.js');
+  const data = L.standaardData();
+  assert.deepStrictEqual(L.agendaTekstVoor(data, 'zw', '2026-11-25'), {});
+  L.zetAgendaTekst(data, 'zw', '2026-11-25', { titel: 'Zwemles', tijd: '' }, 'reeks');
+  L.zetAgendaTekst(data, 'zw', '2026-12-02', { tijd: '18:00' }, 'dag');
+  assert.deepStrictEqual(L.agendaTekstVoor(data, 'zw', '2026-11-25'), { titel: 'Zwemles' });
+  assert.deepStrictEqual(L.agendaTekstVoor(data, 'zw', '2026-12-02'), { titel: 'Zwemles', tijd: '18:00' });
+  const terug = L.normaliseer(JSON.parse(JSON.stringify(data)));
+  assert.deepStrictEqual(terug.agendaTekst, data.agendaTekst);
+  L.ruimOudeAanpassingenOp(terug, d('2027-03-01'), 60);
+  assert.deepStrictEqual(L.agendaTekstVoor(terug, 'zw', '2026-12-02'), { titel: 'Zwemles' });
+  L.zetAgendaTekst(terug, 'zw', '2026-12-09', {}, 'reeks');
+  assert.deepStrictEqual(L.agendaTekstVoor(terug, 'zw', '2026-12-09'), {});
+  L.zetAgendaTekst(data, 'zw', '2026-11-25', { titel: 'X' }, 'reeks');
+  L.wisAgendaWie(data, 'zw', '2026-11-25', 'reeks');
+  assert.deepStrictEqual(data.agendaTekst, {});
+});

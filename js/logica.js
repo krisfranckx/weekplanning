@@ -116,7 +116,7 @@
       }
       week.push(dag);
     }
-    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [], agendaWie: {} };
+    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [], agendaWie: {}, agendaTekst: {} };
   }
 
   /** Vult ontbrekende velden aan, zodat oudere of geïmporteerde data blijft werken. */
@@ -143,6 +143,17 @@
     if (data.agendaWie && typeof data.agendaWie === 'object') {
       Object.keys(data.agendaWie).forEach(k => {
         if (Array.isArray(data.agendaWie[k])) uit.agendaWie[k] = data.agendaWie[k].filter(x => typeof x === 'string');
+      });
+    }
+    uit.agendaTekst = {};
+    if (data.agendaTekst && typeof data.agendaTekst === 'object') {
+      Object.keys(data.agendaTekst).forEach(k => {
+        const t = data.agendaTekst[k];
+        if (!t || typeof t !== 'object') return;
+        const w = {};
+        if (typeof t.titel === 'string' && t.titel.trim()) w.titel = t.titel.trim();
+        if (typeof t.tijd === 'string' && /^\d{2}:\d{2}$/.test(t.tijd)) w.tijd = t.tijd;
+        if (Object.keys(w).length) uit.agendaTekst[k] = w;
       });
     }
     for (let i = 0; i < 7; i++) {
@@ -349,10 +360,10 @@
       if (s < grens) delete data.aanpassingen[s];
     });
     // Personen bij één keer van een agenda-afspraak (sleutel "uid|JJJJ-MM-DD")
-    Object.keys(data.agendaWie || {}).forEach(k => {
+    [data.agendaWie || {}, data.agendaTekst || {}].forEach(lijst => Object.keys(lijst).forEach(k => {
       const datum = k.split('|')[1];
-      if (datum && datum < grens) delete data.agendaWie[k];
-    });
+      if (datum && datum < grens) delete lijst[k];
+    }));
   }
 
   function lid(data, id) {
@@ -403,14 +414,41 @@
     }
   }
 
-  /** Terug naar automatisch (namen in de titel), voor deze keer of voor de hele reeks. */
+  /**
+   * Terug naar wat in de agenda staat (personen: namen in de titel; titel en tijd: uit de agenda),
+   * voor deze keer of voor de hele reeks.
+   */
   function wisAgendaWie(data, uid, datum, bereik) {
-    if (!data.agendaWie) return;
-    delete data.agendaWie[uid + '|' + datum];
-    if (bereik !== 'dag') {
-      delete data.agendaWie[uid];
-      Object.keys(data.agendaWie).forEach(k => { if (k.startsWith(uid + '|')) delete data.agendaWie[k]; });
-    }
+    [data.agendaWie, data.agendaTekst].forEach(lijst => {
+      if (!lijst) return;
+      delete lijst[uid + '|' + datum];
+      if (bereik !== 'dag') {
+        delete lijst[uid];
+        Object.keys(lijst).forEach(k => { if (k.startsWith(uid + '|')) delete lijst[k]; });
+      }
+    });
+  }
+
+  /* data.agendaTekst: zelfde sleutels als agendaWie, met { titel?, tijd? } die in de app
+     gewijzigd werden. Dat wordt niet teruggeschreven naar de agenda zelf. */
+
+  /** Gewijzigde titel en tijd ({} als er niets gewijzigd is). Eén keer gaat voor op elke keer. */
+  function agendaTekstVoor(data, uid, datum) {
+    const lijst = data.agendaTekst || {};
+    return Object.assign({}, lijst[uid], lijst[uid + '|' + datum]);
+  }
+
+  /** wijziging = { titel?, tijd? }: alleen wat afwijkt van de agenda. Leeg = niets gewijzigd. */
+  function zetAgendaTekst(data, uid, datum, wijziging, bereik) {
+    if (!uid) return;
+    data.agendaTekst = data.agendaTekst || {};
+    const w = {};
+    if (wijziging && wijziging.titel) w.titel = String(wijziging.titel).trim();
+    if (wijziging && wijziging.tijd) w.tijd = wijziging.tijd;
+    const sleutel = bereik === 'dag' ? uid + '|' + datum : uid;
+    if (Object.keys(w).length) data.agendaTekst[sleutel] = w;
+    else delete data.agendaTekst[sleutel];
+    if (bereik !== 'dag') delete data.agendaTekst[uid + '|' + datum];
   }
 
   /* ---------- Thuis of op kantoor ---------- */
@@ -661,7 +699,7 @@
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
     verschillen, voegWijzigingenToe,
     WERKPLEKKEN, zetWerk, herstelWerk,
-    agendaWieVoor, zetAgendaWie, wisAgendaWie,
+    agendaWieVoor, zetAgendaWie, wisAgendaWie, agendaTekstVoor, zetAgendaTekst,
     bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };
 
