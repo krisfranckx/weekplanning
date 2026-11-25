@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '7 (25 nov 2026)';
+  const APP_VERSIE = '8 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -45,9 +45,53 @@
 
   /** Nieuwe planning van Supabase (partner of eerste koppeling). */
   let wachtOpTekenen = false;
-  function nieuweGedeeldeData(data, bron) {
+  // ---------- Nieuw sinds je vorige bezoek ----------
+
+  const NIEUW_SLEUTEL = 'weekplanning.nieuw';
+
+  function leesNieuw() {
+    try {
+      const lijst = JSON.parse(localStorage.getItem(NIEUW_SLEUTEL)) || [];
+      const grens = L.datumSleutel(vandaag());
+      return lijst.filter(x => x.datum >= grens);
+    } catch (e) { return []; }
+  }
+
+  function zetNieuw(lijst) {
+    try { localStorage.setItem(NIEUW_SLEUTEL, JSON.stringify(lijst)); } catch (e) { /* geen opslag */ }
+    zetBadge(lijst.length);
+  }
+
+  /** Getal op het app-icoon (waar het toestel dat toelaat). */
+  function zetBadge(aantal) {
+    try {
+      if (aantal > 0 && navigator.setAppBadge) navigator.setAppBadge(aantal).catch(() => {});
+      else if (navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+    } catch (e) { /* niet ondersteund */ }
+  }
+
+  function nieuwKaartHtml() {
+    const lijst = leesNieuw();
+    if (!lijst.length) return '';
+    return '<section class="kaart nieuw-kaart"><div class="kaart-kop"><span class="icoon">🔔</span>' +
+      '<h2>Gewijzigd sinds je vorige bezoek</h2></div><ul class="nieuw-lijst">' +
+      lijst.map(x => '<li><button data-actie="open-dag" data-datum="' + e(x.datum) + '">' +
+        '<span class="nieuw-datum">' + e(L.datumKort(L.vanSleutel(x.datum))) + '</span> ' + e(x.tekst) + '</button></li>').join('') +
+      '</ul><button class="knop secundair" data-actie="nieuw-gezien">Gezien</button></section>';
+  }
+
+  function nieuweGedeeldeData(data, bron, meta) {
+    const oud = staat.data;
     staat.data = L.normaliseer(data);
-    bewaar(bron === 'partner' ? 'Planning bijgewerkt door je partner' : 'Gedeelde planning geladen', true);
+    let aantalNieuw = 0;
+    if (bron !== 'eerste') {
+      const verschil = L.verschillen(oud, staat.data, vandaag(), 14)
+        .map(x => Object.assign(x, { door: meta && meta.door || null }));
+      aantalNieuw = verschil.length;
+      if (aantalNieuw) zetNieuw(L.voegWijzigingenToe(leesNieuw(), verschil));
+    }
+    bewaar(bron === 'eerste' ? 'Gedeelde planning geladen'
+      : aantalNieuw ? 'Je partner heeft de planning gewijzigd' : null, true);
     if (blad.open) wachtOpTekenen = true; // niet storen tijdens het bewerken
     else if (!document.activeElement || !inhoud.contains(document.activeElement) || staat.scherm === 'dag') teken();
     else wachtOpTekenen = true;
@@ -168,6 +212,7 @@
     if (!isVandaag) {
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">↩ Terug naar vandaag</button>';
     }
+    html += nieuwKaartHtml();
 
     if (plan.school) {
       html +=
@@ -402,6 +447,10 @@
         '<p class="deel-status" data-soort="' + e(st.soort) + '">' + e(st.tekst) + '</p>' +
         '<div class="knoppen"><button class="knop secundair" data-actie="deel-link">Link voor partner kopiëren</button></div>' +
         '<p class="uitleg">Stuur die link naar je partner, of plak hem in de app op je beginscherm (die heeft op iPhone een eigen geheugen). Daarna log je in met je eigen e-mailadres.</p>' +
+        (('setAppBadge' in navigator) && window.Notification && Notification.permission === 'default'
+          ? '<p class="uitleg">Wil je een getal op het app-icoon als er iets gewijzigd is? Dat moet je toestel eerst toelaten.</p>' +
+            '<div class="knoppen"><button class="knop secundair" data-actie="badge-toestaan">Teller op app-icoon toestaan</button></div>'
+          : '') +
         '<button class="link" data-actie="deel-uit">Uitloggen</button> · ' +
         '<button class="link gevaar" data-actie="deel-stop">Delen stoppen op dit toestel</button>';
     }
@@ -773,6 +822,15 @@
         bewaar(knop.dataset.gerecht + ' verwijderd uit de lijst');
         teken();
         break;
+      case 'nieuw-gezien':
+        zetNieuw([]);
+        teken();
+        break;
+      case 'badge-toestaan':
+        if (window.Notification) {
+          Notification.requestPermission().then(() => { zetBadge(leesNieuw().length); teken(); });
+        }
+        break;
       case 'deel-link':
         kopieerKoppelLink();
         break;
@@ -875,5 +933,6 @@
     }
   }
 
+  zetBadge(leesNieuw().length);
   teken();
 })();

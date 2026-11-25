@@ -88,7 +88,7 @@
   // ---------- Synchroniseren ----------
 
   async function haalOp() {
-    const { data, error } = await client.from(TABEL).select('data, bijgewerkt, apparaat').eq('id', RIJ).maybeSingle();
+    const { data, error } = await client.from(TABEL).select('data, bijgewerkt, apparaat, bijgewerkt_door').eq('id', RIJ).maybeSingle();
     if (error) throw error;
     return data;
   }
@@ -150,7 +150,7 @@
         await verstuur();
       } else if (!s.laatsteSync || op.bijgewerkt > s.laatsteSync) {
         // Eerste keer gekoppeld, of de partner heeft intussen iets gewijzigd: overnemen.
-        opties.opNieuweData(op.data, 'gedeeld');
+        opties.opNieuweData(op.data, s.laatsteSync ? 'gedeeld' : 'eerste', { door: op.bijgewerkt_door });
         zetSyncStaat({ wachtend: false, laatsteSync: op.bijgewerkt });
         zetStatus('ok', 'Gedeeld');
       } else {
@@ -171,7 +171,7 @@
         if (!rij || !rij.data) return;
         if (rij.apparaat === syncStaat().apparaat) return; // onze eigen wijziging
         if (syncStaat().wachtend) return; // eigen wijzigingen gaan eerst mee
-        opties.opNieuweData(rij.data, 'partner');
+        opties.opNieuweData(rij.data, 'partner', { door: rij.bijgewerkt_door });
         zetSyncStaat({ laatsteSync: rij.bijgewerkt });
         zetStatus('ok', 'Gedeeld');
       })

@@ -145,3 +145,28 @@ test('normaliseer: oude data krijgt gerechtenlijst met gerechten uit de planning
   const eigen = L.normaliseer({ gerechten: ['Alleen dit'], week: [] });
   assert.deepEqual(eigen.gerechten, ['Alleen dit']);
 });
+
+test('verschillen tussen twee versies van de planning', () => {
+  const oud = L.standaardData();
+  const nieuw = L.normaliseer(JSON.parse(JSON.stringify(oud)));
+  assert.deepEqual(L.verschillen(oud, nieuw, woensdag, 14), []);
+  const donderdag = L.plusDagen(woensdag, 1);
+  L.zetVeld(nieuw, donderdag, 'halen', { wie: 'ouder2', tijd: '16:00' }, 'dag');
+  L.zetVeld(nieuw, donderdag, 'eten', { wat: 'Lasagne', kok: 'ouder1' }, 'dag');
+  L.bewaarActiviteit(nieuw, donderdag, { titel: 'Zwemles', tijd: '17:00', wie: [] }, 'dag');
+  const v = L.verschillen(oud, nieuw, woensdag, 14);
+  assert.deepEqual(v.map(x => x.tekst), [
+    'Ophalen: Eva om 16:00 (was Kris)',
+    'Avondeten: Lasagne (kookt: Kris)',
+    'Activiteit: 17:00 Zwemles'
+  ]);
+  assert.ok(v.every(x => x.datum === '2026-11-26'));
+  // Standaardweek-wijziging toont op elke komende dag van die weekdag
+  const n2 = L.normaliseer(JSON.parse(JSON.stringify(oud)));
+  n2.week[0].eten = { wat: 'Pizza', kok: null };
+  assert.equal(L.verschillen(oud, n2, woensdag, 14).length, 2);
+  // Samenvoegen: nieuwere tekst vervangt oudere voor hetzelfde onderdeel
+  const lijst = L.voegWijzigingenToe(v, [{ sleutel: '2026-11-26|eten', datum: '2026-11-26', tekst: 'Avondeten: Soep' }]);
+  assert.equal(lijst.length, 3);
+  assert.ok(lijst.some(x => x.tekst === 'Avondeten: Soep'));
+});
