@@ -325,3 +325,10 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 }
 .eten-knop .klein-grijs { margin: 0; }
 .eten-wat { font-weight: 600; }
+
+/* ---------- Nieuw sinds vorige bezoek ---------- */
+.nieuw-kaart { border: 2px solid #f0a202; }
+.nieuw-lijst { list-style: none; margin: 0 0 10px; padding: 0; }
+.nieuw-lijst li + li { border-top: 1px solid var(--lijn); }
+.nieuw-lijst button { width: 100%; text-align: left; border: none; background: none; padding: 8px 0; }
+.nieuw-datum { font-weight: 700; color: var(--badge-tekst); margin-right: 4px; }

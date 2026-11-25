@@ -420,6 +420,52 @@
       .filter(g => !z || g.toLowerCase().includes(z));
   }
 
+  // ---------- Wijzigingen tussen twee versies ----------
+
+  /**
+   * Wat is er veranderd tussen `oud` en `nieuw`, voor de komende `dagen` dagen vanaf `vanaf`?
+   * Geeft een lijst { sleutel, datum, tekst } (sleutel = datum + onderdeel, om dubbels te vervangen).
+   */
+  function verschillen(oud, nieuw, vanaf, dagen) {
+    const uit = [];
+    const naam = id => { const l = lid(nieuw, id) || lid(oud, id); return l ? l.naam : 'niemand'; };
+    for (let i = 0; i < (dagen || 14); i++) {
+      const datum = plusDagen(vanaf, i);
+      const a = dagPlan(oud, datum);
+      const b = dagPlan(nieuw, datum);
+      const s = datumSleutel(datum);
+      const voeg = (deel, tekst) => uit.push({ sleutel: s + '|' + deel, datum: s, tekst: tekst });
+
+      if (a.school !== b.school) voeg('school', b.school ? 'Toch school' : 'Geen school');
+      if (b.school) {
+        [['brengen', 'Brengen'], ['halen', 'Ophalen']].forEach(([veld, label]) => {
+          if (a[veld].wie !== b[veld].wie || a[veld].tijd !== b[veld].tijd) {
+            voeg(veld, label + ': ' + naam(b[veld].wie) + (b[veld].tijd ? ' om ' + b[veld].tijd : '') +
+              (a[veld].wie !== b[veld].wie && a.school ? ' (was ' + naam(a[veld].wie) + ')' : ''));
+          }
+        });
+      }
+      if ((a.eten.wat || '') !== (b.eten.wat || '') || a.eten.kok !== b.eten.kok) {
+        voeg('eten', 'Avondeten: ' + (b.eten.wat || 'nog niet beslist') + (b.eten.kok ? ' (kookt: ' + naam(b.eten.kok) + ')' : ''));
+      }
+      const sleutelAct = x => (x.tijd || '') + ' ' + x.titel + ' ' + (x.wie || []).join(',');
+      const oudeActs = a.activiteiten.map(sleutelAct);
+      const nieuweActs = b.activiteiten.map(sleutelAct);
+      b.activiteiten.filter(x => !oudeActs.includes(sleutelAct(x))).forEach(x =>
+        voeg('act+' + x.titel, 'Activiteit: ' + (x.tijd ? x.tijd + ' ' : '') + x.titel));
+      a.activiteiten.filter(x => !nieuweActs.includes(sleutelAct(x)) &&
+        !b.activiteiten.some(y => y.titel === x.titel)).forEach(x =>
+        voeg('act-' + x.titel, 'Geschrapt: ' + x.titel));
+    }
+    return uit;
+  }
+
+  /** Nieuwe wijzigingen bij een bestaande lijst voegen (nieuwere vervangt oudere voor hetzelfde onderdeel). */
+  function voegWijzigingenToe(lijst, nieuw) {
+    const uit = (lijst || []).filter(x => !nieuw.some(n => n.sleutel === x.sleutel));
+    return uit.concat(nieuw).sort((x, y) => x.datum.localeCompare(y.datum));
+  }
+
   const Logica = {
     DAGEN, DAGEN_KORT, MAANDEN, KLEUREN, DAGVELDEN,
     weekdagIndex, datumSleutel, vanSleutel, plusDagen, maandagVan, zelfdeDag,
@@ -427,7 +473,8 @@
     maakId, standaardData, normaliseer, dagPlan,
     zetVeld, herstelVeld, bewaarActiviteit, verwijderActiviteit, herstelActiviteit,
     ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
-    voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht
+    voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
+    verschillen, voegWijzigingenToe
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Logica;
