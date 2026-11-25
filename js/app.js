@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '17 (25 nov 2026)';
+  const APP_VERSIE = '18 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -384,7 +384,7 @@
     // Todo's: alleen als er voor deze dag zijn (toevoegen gaat via het tabblad Todo's)
     const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
     if (todos.length) {
-      html += '<section class="kaart lijst"><ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
+      html += '<section class="kaart lijst dag-todos"><ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
     }
 
     // Avondeten
