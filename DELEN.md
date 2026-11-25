@@ -67,6 +67,11 @@ Gebruik **niet** de *secret* of *service_role* sleutel.
 
 Tip: tik in de browser op **Delen** > **Zet op beginscherm**, dan opent de app als een gewone app.
 
+**Let op, iPhone:** de app op het beginscherm heeft een eigen geheugen, los van Safari. Koppel hem
+daarom apart: tik in Safari bij **Gezin** > **Samen delen** op **Link voor partner kopiëren**, open
+dan de app op het beginscherm, ga naar **Gezin** > **Samen delen**, plak de link bij
+**Koppel-link plakken** en log in.
+
 ## Goed om te weten
 
 - **Offline**: je kan altijd verder plannen. Wijzigingen gaan mee zodra er weer internet is

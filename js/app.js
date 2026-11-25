@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '5 (25 nov 2026)';
+  const APP_VERSIE = '6 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -376,11 +376,15 @@
     if (!S.config()) {
       html += '<p class="uitleg">Deel de planning live met je partner via een gratis Supabase-project. ' +
         'Volg eerst het <a href="' + STAPPENPLAN + '" target="_blank" rel="noopener">stappenplan</a>, vul dan hieronder de twee gegevens in. ' +
-        'Kreeg je een koppel-link van je partner? Open die gewoon, dan staat dit al ingevuld.</p>' +
+        'Kreeg je een koppel-link? Open die, of plak hem hieronder (nodig in de app op je beginscherm).</p>' +
+        '<form id="deel-plak" class="deel-form">' +
+        '<label class="veld">Koppel-link plakken<input type="text" name="link" required placeholder="https://…#koppel=…" autocomplete="off" spellcheck="false"></label>' +
+        '<button class="knop" type="submit">Koppelen</button></form>' +
+        '<details class="handmatig"><summary>Of vul de Supabase-gegevens zelf in</summary>' +
         '<form id="deel-config" class="deel-form">' +
         '<label class="veld">Project-URL<input type="url" name="url" required placeholder="https://xxxx.supabase.co" autocomplete="off"></label>' +
         '<label class="veld">Publieke sleutel (anon / publishable)<input type="text" name="sleutel" required autocomplete="off" spellcheck="false"></label>' +
-        '<button class="knop" type="submit">Verder</button></form>';
+        '<button class="knop" type="submit">Verder</button></form></details>';
     } else if (!S.gebruiker()) {
       html += '<p class="uitleg">Log in met je eigen e-mailadres. Eerste keer? Kies <strong>Account aanmaken</strong>. ' +
         'Staat er al een gedeelde planning, dan neemt dit toestel die over.</p>' +
@@ -395,7 +399,7 @@
       html += '<p>Ingelogd als <strong>' + e(S.gebruiker().email) + '</strong></p>' +
         '<p class="deel-status" data-soort="' + e(st.soort) + '">' + e(st.tekst) + '</p>' +
         '<div class="knoppen"><button class="knop secundair" data-actie="deel-link">Link voor partner kopiëren</button></div>' +
-        '<p class="uitleg">Stuur die link naar je partner. Wie hem opent, krijgt de Supabase-gegevens automatisch ingevuld en logt daarna in met het eigen e-mailadres.</p>' +
+        '<p class="uitleg">Stuur die link naar je partner, of plak hem in de app op je beginscherm (die heeft op iPhone een eigen geheugen). Daarna log je in met je eigen e-mailadres.</p>' +
         '<button class="link" data-actie="deel-uit">Uitloggen</button> · ' +
         '<button class="link gevaar" data-actie="deel-stop">Delen stoppen op dit toestel</button>';
     }
@@ -408,7 +412,10 @@
     const knoppen = form.querySelectorAll('button');
     knoppen.forEach(k => { k.disabled = true; });
     try {
-      if (form.id === 'deel-config') {
+      if (form.id === 'deel-plak') {
+        if (!S.koppelVanTekst(f.get('link'))) throw new Error('Dat is geen geldige koppel-link');
+        meld('Gekoppeld. Log nu in met je eigen e-mailadres.');
+      } else if (form.id === 'deel-config') {
         S.zetConfig(f.get('url'), f.get('sleutel'));
         meld('Opgeslagen. Log nu in.');
       } else if (knopWaarde === 'nieuw') {
