@@ -80,6 +80,7 @@
       // Woensdagnamiddag is er in Belgie geen school.
       halen: { wie: null, tijd: weekdag === 2 ? '12:05' : '15:30' },
       eten: { wat: '', kok: null },
+      werk: {}, // per ouder: 'thuis' | 'kantoor' | 'vrij'
       activiteiten: []
     };
   }
@@ -146,6 +147,7 @@
         brengen: Object.assign(leeg.brengen, bron.brengen),
         halen: Object.assign(leeg.halen, bron.halen),
         eten: Object.assign(leeg.eten, bron.eten),
+        werk: geldigWerk(bron.werk),
         activiteiten: Array.isArray(bron.activiteiten) ? bron.activiteiten : []
       });
     }
@@ -215,6 +217,9 @@
     const extra = (aanp.extra || []).map(a => Object.assign(kopie(a), { eenmalig: true }));
     plan.activiteiten = sorteerOpTijd(vast.concat(extra));
     plan.overgeslagen = patroon.activiteiten.filter(a => overslaan.includes(a.id)).map(kopie);
+    plan.werk = geldigWerk(Object.assign({}, patroon.werk, aanp.werk));
+    plan.aangepast.werk = Object.keys(aanp.werk || {});
+    if (!plan.aangepast.werk.length) delete plan.aangepast.werk;
     return plan;
   }
 
@@ -228,6 +233,7 @@
     if (!a) return;
     if (a.overslaan && a.overslaan.length === 0) delete a.overslaan;
     if (a.extra && a.extra.length === 0) delete a.extra;
+    if (a.werk && Object.keys(a.werk).length === 0) delete a.werk;
     if (Object.keys(a).length === 0) delete data.aanpassingen[sleutel];
   }
 
@@ -349,13 +355,52 @@
       if (dag.brengen && dag.brengen.wie === id) dag.brengen.wie = null;
       if (dag.halen && dag.halen.wie === id) dag.halen.wie = null;
       if (dag.eten && dag.eten.kok === id) dag.eten.kok = null;
+      if (dag.werk) delete dag.werk[id];
       ['activiteiten', 'extra'].forEach(k => {
         (dag[k] || []).forEach(a => { a.wie = (a.wie || []).filter(x => x !== id); });
       });
     };
     data.week.forEach(wis);
     Object.values(data.aanpassingen).forEach(wis);
+    Object.keys(data.aanpassingen).forEach(k => ruimLegeAanpassingOp(data, k));
     (data.todos || []).forEach(t => { if (t.wie === id) t.wie = null; });
+  }
+
+  /* ---------- Thuis of op kantoor ---------- */
+
+  const WERKPLEKKEN = ['thuis', 'kantoor', 'vrij'];
+
+  function geldigWerk(werk) {
+    const uit = {};
+    if (werk && typeof werk === 'object') {
+      Object.keys(werk).forEach(id => { if (WERKPLEKKEN.includes(werk[id])) uit[id] = werk[id]; });
+    }
+    return uit;
+  }
+
+  /** Waar werkt `lidId` op `datum`? waarde '' of null = niet ingevuld. */
+  function zetWerk(data, datum, lidId, waarde, bereik) {
+    const sleutel = datumSleutel(datum);
+    const geldig = WERKPLEKKEN.includes(waarde) ? waarde : null;
+    if (bereik === 'week') {
+      const w = data.week[weekdagIndex(datum)].werk;
+      if (geldig) w[lidId] = geldig; else delete w[lidId];
+      const a = data.aanpassingen[sleutel];
+      if (a && a.werk) { delete a.werk[lidId]; ruimLegeAanpassingOp(data, sleutel); }
+    } else {
+      const a = aanpassingVoor(data, sleutel);
+      a.werk = a.werk || {};
+      if (geldig) a.werk[lidId] = geldig;
+      else if ((data.week[weekdagIndex(datum)].werk || {})[lidId]) a.werk[lidId] = 'onbekend'; // standaard bewust leegmaken
+      else delete a.werk[lidId];
+      ruimLegeAanpassingOp(data, sleutel);
+    }
+  }
+
+  function herstelWerk(data, datum, lidId) {
+    const sleutel = datumSleutel(datum);
+    const a = data.aanpassingen[sleutel];
+    if (a && a.werk) { delete a.werk[lidId]; ruimLegeAanpassingOp(data, sleutel); }
   }
 
   /* ---------- Todo's ---------- */
@@ -516,6 +561,12 @@
           }
         });
       }
+      const ouders = new Set(Object.keys(a.werk).concat(Object.keys(b.werk)));
+      ouders.forEach(id => {
+        if (a.werk[id] !== b.werk[id]) {
+          voeg('werk|' + id, naam(id) + ': ' + ({ thuis: 'thuis', kantoor: 'op kantoor', vrij: 'vrij' }[b.werk[id]] || 'niet ingevuld'));
+        }
+      });
       if ((a.eten.wat || '') !== (b.eten.wat || '') || a.eten.kok !== b.eten.kok) {
         voeg('eten', 'Avondeten: ' + (b.eten.wat || 'nog niet beslist') + (b.eten.kok ? ' (kookt: ' + naam(b.eten.kok) + ')' : ''));
       }
@@ -562,6 +613,7 @@
     ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
     verschillen, voegWijzigingenToe,
+    WERKPLEKKEN, zetWerk, herstelWerk,
     bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };
 
