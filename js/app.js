@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '12 (25 nov 2026)';
+  const APP_VERSIE = '13 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -272,10 +272,6 @@
       (plan.eten.kok ? '<p class="klein-grijs">Kookt: ' + persoon(plan.eten.kok) + '</p>' : '') +
       '</button>';
 
-    if (plan.school) {
-      html += '<button class="link midden" data-actie="bewerk" data-veld="school">Geen school vandaag? (vakantie, vrije dag)</button>';
-    }
-
     inhoud.innerHTML = html;
   }
 
@@ -295,7 +291,7 @@
       const w = plan.werk[l.id];
       return '<button class="kaart werk getint' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) +
         '" style="--kleur:' + e(l.kleur) + '" aria-label="' + e(l.naam) + ': ' + e(w ? WERK_TEKST[w] : 'niet ingevuld') + '" title="' + e(l.naam) + '">' +
-        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') +
+        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) : '<span class="werk-vraag">?</span>') +
         (aangepast.includes(l.id) ? '<span class="stipje" title="Alleen deze dag"></span>' : '') + '</span>' +
         '</button>';
     }).join('') + '</div>';
@@ -826,7 +822,11 @@
       ? Object.assign(JSON.parse(JSON.stringify(staat.data.week[weekdag])), { aangepast: {} })
       : L.dagPlan(staat.data, datum);
     const aangepast = !!plan.aangepast[veld];
-    const herstel = aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '';
+    let herstel = aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '';
+    // Vakantie of vrije dag: vanuit brengen/ophalen (er staat geen aparte knop meer op Vandaag)
+    if (!alleenWeek && (veld === 'brengen' || veld === 'halen')) {
+      herstel += '<button type="button" class="link" data-blad="geen-school">Geen school op ' + L.datumKort(datum) + '</button>';
+    }
     let html;
 
     if (veld === 'brengen' || veld === 'halen') {
@@ -854,6 +854,11 @@
       if (knop === 'herstel') {
         L.herstelVeld(staat.data, datum, veld);
         bewaar('Terug zoals in de standaardweek');
+        return;
+      }
+      if (knop === 'geen-school') {
+        L.zetVeld(staat.data, datum, 'school', false, 'dag');
+        bewaar('Geen school op ' + L.datumKort(datum));
         return;
       }
       const f = new FormData(form);
