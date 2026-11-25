@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '11 (25 nov 2026)';
+  const APP_VERSIE = '12 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -293,8 +293,8 @@
     const aangepast = plan.aangepast.werk || [];
     return '<div class="werkbalk" style="--aantal:' + lijst.length + '">' + lijst.map(l => {
       const w = plan.werk[l.id];
-      return '<button class="kaart werk' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) + '">' +
-        '<span class="persoon" style="--kleur:' + e(l.kleur) + '"><i>' + initiaal(l.naam) + '</i>' + e(l.naam) + '</span>' +
+      return '<button class="kaart werk getint' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) +
+        '" style="--kleur:' + e(l.kleur) + '" aria-label="' + e(l.naam) + ': ' + e(w ? WERK_TEKST[w] : 'niet ingevuld') + '" title="' + e(l.naam) + '">' +
         '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') +
         (aangepast.includes(l.id) ? '<span class="stipje" title="Alleen deze dag"></span>' : '') + '</span>' +
         '</button>';
@@ -303,11 +303,14 @@
 
   /** Brengen of ophalen als één compacte regel. */
   function schoolRij(veld, icoon, label, deel, aangepast) {
-    return '<button class="school-rij" data-actie="bewerk" data-veld="' + veld + '">' +
+    const lid = L.lid(staat.data, deel.wie);
+    return '<button class="school-rij' + (lid ? ' getint' : ' leeg') + '" data-actie="bewerk" data-veld="' + veld + '"' +
+      (lid ? ' style="--kleur:' + e(lid.kleur) + '" title="' + e(lid.naam) + '"' : '') +
+      ' aria-label="' + label + (deel.tijd ? ' om ' + e(deel.tijd) : '') + ': ' + (lid ? e(lid.naam) : 'nog niemand') + '">' +
       '<span class="school-ic">' + icoon + '</span>' +
       '<span class="school-label">' + label + '</span>' +
       '<span class="school-tijd">' + e(deel.tijd || '') + '</span>' +
-      '<span class="school-wie">' + persoon(deel.wie, 'Nog niemand') + '</span>' +
+      (lid ? '' : '<span class="school-wie">Nog niemand</span>') +
       (aangepast ? '<span class="stipje" title="Alleen deze dag"></span>' : '') +
       '</button>';
   }

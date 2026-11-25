@@ -553,3 +553,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .school-wie { flex: 1; font-weight: 650; min-width: 0; }
 .school-wie .persoon i { width: 1.5em; height: 1.5em; }
 .chip-keuze span .ic { width: 18px; height: 18px; }
+
+/* ---------- Kleur van de persoon in plaats van de naam ---------- */
+
+.getint {
+  background: linear-gradient(color-mix(in srgb, var(--kleur) 18%, transparent), color-mix(in srgb, var(--kleur) 18%, transparent)), var(--kaart);
+  border-color: color-mix(in srgb, var(--kleur) 40%, var(--lijn));
+}
+@media (prefers-color-scheme: dark) {
+  .getint {
+    background: linear-gradient(color-mix(in srgb, var(--kleur) 24%, transparent), color-mix(in srgb, var(--kleur) 24%, transparent)), var(--kaart);
+  }
+}
+.kaart.werk { justify-content: center; min-height: 64px; }
+.werk.getint .werk-plek { color: var(--tekst); }
+.werk.getint .werk-plek .ic { color: color-mix(in srgb, var(--kleur) 75%, var(--tekst)); }
+.werk-leeg .werk-plek { color: var(--grijs); }
+
+.school-kaart { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+.school-rij { border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; }
+.school-rij + .school-rij { border-top: 1px solid transparent; }
+.school-rij.getint { border-color: color-mix(in srgb, var(--kleur) 40%, var(--lijn)); }
+.school-rij.getint .school-ic { color: color-mix(in srgb, var(--kleur) 75%, var(--tekst)); }
+.school-rij.getint .school-label, .school-rij.getint .school-tijd { color: var(--tekst); }
+.school-rij.getint .school-tijd { margin-left: auto; text-align: right; }
+.school-rij.leeg { background: var(--veld); }
+.school-rij.leeg .school-wie { color: var(--grijs-licht); font-style: italic; font-weight: 500; text-align: right; }
