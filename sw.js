@@ -1,5 +1,5 @@
 /* Eenvoudige service worker: eerst het netwerk proberen, anders de bewaarde kopie (offline). */
-const CACHE = 'weekplanning-v23';
+const CACHE = 'weekplanning-v24';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 const BESTANDEN = ['./', 'index.html', 'css/stijl.css', 'js/logica.js', 'js/app.js', 'manifest.webmanifest', 'icoon.svg', 'js/sync.js', 'js/iconen.js', 'js/agenda.js'];
 
@@ -40,4 +40,26 @@ self.addEventListener('fetch', ev => {
       })
       .catch(() => caches.match(ev.request))
   );
+});
+
+/* Pushmeldingen (ochtendmelding, todo-herinnering), gestuurd door de Supabase-functie "meldingen". */
+self.addEventListener('push', ev => {
+  let m = {};
+  try { m = ev.data ? ev.data.json() : {}; } catch (e) { m = { tekst: ev.data ? ev.data.text() : '' }; }
+  ev.waitUntil(self.registration.showNotification(m.titel || 'Weekplanning', {
+    body: m.tekst || '',
+    tag: m.tag || 'weekplanning',
+    icon: 'icoon.svg',
+    data: { url: m.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', ev => {
+  ev.notification.close();
+  const doel = new URL((ev.notification.data && ev.notification.data.url) || './', self.registration.scope).href;
+  ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(vensters => {
+    const open = vensters.find(v => v.url.startsWith(self.registration.scope));
+    if (open) return open.focus();
+    return self.clients.openWindow(doel);
+  }));
 });

@@ -78,6 +78,11 @@ Zonder Supabase werkt de app gewoon lokaal op één toestel.
 Afspraken uit één gedeelde agenda (bv. een iCloud-agenda *Gezin* die je in WeekCal gebruikt)
 verschijnen als activiteit, alleen lezen. Zie [AGENDA.md](AGENDA.md).
 
+## Meldingen en schoolvakanties
+
+- Vlaamse schoolvakanties en vrije dagen zitten in de app (`js/logica.js`, `VAKANTIES`): op die dagen valt brengen/ophalen weg. Aan/uit bij Gezin > Schoolvakanties.
+- Ochtendmelding (wie brengt, ophaalt, kookt) en todo-herinnering de avond vóór de deadline, per toestel aan te zetten. Eenmalig instellen in Supabase: zie [MELDINGEN.md](MELDINGEN.md).
+
 ## Online zetten
 
 De app kan op GitHub Pages: *Settings* > *Pages* > *Deploy from a branch*, map `/ (root)`.

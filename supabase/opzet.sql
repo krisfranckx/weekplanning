@@ -286,3 +286,163 @@ revoke all on function public.verwijder_agenda(integer) from public, anon;
 grant execute on function public.verwijder_agenda(integer) to authenticated;
 revoke all on function public.agenda_ophalen() from public, anon;
 grant execute on function public.agenda_ophalen() to authenticated;
+
+-- 9. Pushmeldingen: ochtendmelding en todo-herinnering
+-- Elk toestel schrijft zich apart in (Gezin > Meldingen in de app), met eigen tijden.
+-- De Edge Function "meldingen" stuurt de meldingen (zie MELDINGEN.md); Supabase roept ze
+-- om de 5 minuten aan. De sleutels en inschrijvingen zijn alleen via de functies hieronder
+-- of door de Edge Function zelf te lezen.
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron with schema pg_catalog;
+
+-- Sleutels voor Web Push (VAPID). De app maakt ze de eerste keer aan.
+create table if not exists public.push_sleutels (
+  id integer primary key default 1 check (id = 1),
+  publiek text not null,
+  prive jsonb not null,
+  geheim text not null default encode(extensions.gen_random_bytes(18), 'hex'),
+  project_url text,
+  apikey text
+);
+alter table public.push_sleutels enable row level security;
+
+create table if not exists public.push_abonnementen (
+  endpoint text primary key,
+  email text not null,
+  p256dh text not null,
+  auth text not null,
+  lid_id text,
+  ochtend boolean not null default true,
+  ochtend_tijd text not null default '07:00',
+  zonder_school boolean not null default false,
+  todos boolean not null default true,
+  todo_tijd text not null default '19:00',
+  laatst_ochtend text,
+  laatst_todo text,
+  bijgewerkt timestamptz not null default now()
+);
+alter table public.push_abonnementen enable row level security;
+
+revoke all on public.push_sleutels, public.push_abonnementen from anon, authenticated;
+grant all on public.push_sleutels, public.push_abonnementen to service_role;
+grant select on public.planning to service_role;
+
+-- Publieke sleutel voor de app. Bestaat er nog geen, dan bewaart dit de meegegeven sleutels.
+-- De app geeft ook de project-URL en publieke apikey mee, zodat de 5-minuten-taak de Edge Function kan vinden.
+create or replace function public.push_sleutel(nieuw_publiek text default null, nieuw_prive jsonb default null,
+  project_url text default null, apikey text default null)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  uit text;
+begin
+  if not public.is_toegelaten() then
+    raise exception 'Geen toegang' using errcode = '42501';
+  end if;
+  if nieuw_publiek is not null and nieuw_prive is not null then
+    insert into public.push_sleutels (id, publiek, prive) values (1, nieuw_publiek, nieuw_prive)
+    on conflict (id) do nothing;
+  end if;
+  if project_url ~* '^https://' then
+    update public.push_sleutels set project_url = rtrim(push_sleutel.project_url, '/'),
+      apikey = coalesce(push_sleutel.apikey, push_sleutels.apikey) where id = 1;
+  end if;
+  select publiek into uit from public.push_sleutels where id = 1;
+  return uit;
+end;
+$$;
+
+-- Dit toestel inschrijven of de instellingen ervan bewaren.
+create or replace function public.bewaar_push(abonnement jsonb, instellingen jsonb)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  mijn_email text := lower(trim(coalesce(auth.jwt() ->> 'email', '')));
+  tijd_ochtend text := coalesce(nullif(instellingen ->> 'ochtendTijd', ''), '07:00');
+  tijd_todo text := coalesce(nullif(instellingen ->> 'todoTijd', ''), '19:00');
+begin
+  if not public.is_toegelaten() then
+    raise exception 'Geen toegang' using errcode = '42501';
+  end if;
+  if coalesce(abonnement ->> 'endpoint', '') !~* '^https://' then
+    raise exception 'Ongeldige inschrijving' using errcode = '22023';
+  end if;
+  if tijd_ochtend !~ '^\d{2}:\d{2}$' then tijd_ochtend := '07:00'; end if;
+  if tijd_todo !~ '^\d{2}:\d{2}$' then tijd_todo := '19:00'; end if;
+  insert into public.push_abonnementen as a (endpoint, email, p256dh, auth, lid_id, ochtend, ochtend_tijd,
+    zonder_school, todos, todo_tijd)
+  values (
+    abonnement ->> 'endpoint', mijn_email,
+    abonnement -> 'keys' ->> 'p256dh', abonnement -> 'keys' ->> 'auth',
+    nullif(instellingen ->> 'lid', ''),
+    coalesce((instellingen ->> 'ochtend')::boolean, true), tijd_ochtend,
+    coalesce((instellingen ->> 'zonderSchool')::boolean, false),
+    coalesce((instellingen ->> 'todos')::boolean, true), tijd_todo)
+  on conflict (endpoint) do update set
+    email = excluded.email, p256dh = excluded.p256dh, auth = excluded.auth, lid_id = excluded.lid_id,
+    ochtend = excluded.ochtend, zonder_school = excluded.zonder_school, todos = excluded.todos,
+    -- Later tijdstip gekozen dan vandaag al gestuurd? Dan mag het vandaag nog eens.
+    laatst_ochtend = case when excluded.ochtend_tijd <> a.ochtend_tijd then null else a.laatst_ochtend end,
+    laatst_todo = case when excluded.todo_tijd <> a.todo_tijd then null else a.laatst_todo end,
+    ochtend_tijd = excluded.ochtend_tijd, todo_tijd = excluded.todo_tijd,
+    bijgewerkt = now();
+end;
+$$;
+
+-- Dit toestel uitschrijven.
+create or replace function public.wis_push(endpoint text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+begin
+  if not public.is_toegelaten() then
+    raise exception 'Geen toegang' using errcode = '42501';
+  end if;
+  delete from public.push_abonnementen a where a.endpoint = wis_push.endpoint;
+end;
+$$;
+
+-- Om de 5 minuten: de Edge Function "meldingen" laten kijken of er iets te sturen is.
+create or replace function public.push_tik()
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public, extensions
+as $$
+declare
+  s record;
+begin
+  select * into s from public.push_sleutels where id = 1;
+  if s.project_url is null or not exists (select 1 from public.push_abonnementen) then
+    return;
+  end if;
+  perform net.http_post(
+    url := s.project_url || '/functions/v1/meldingen',
+    body := jsonb_build_object('soort', 'tik', 'geheim', s.geheim),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'apikey', coalesce(s.apikey, ''),
+      'Authorization', 'Bearer ' || coalesce(s.apikey, ''))
+  );
+end;
+$$;
+
+revoke all on function public.push_sleutel(text, jsonb, text, text) from public, anon;
+grant execute on function public.push_sleutel(text, jsonb, text, text) to authenticated;
+revoke all on function public.bewaar_push(jsonb, jsonb) from public, anon;
+grant execute on function public.bewaar_push(jsonb, jsonb) to authenticated;
+revoke all on function public.wis_push(text) from public, anon;
+grant execute on function public.wis_push(text) to authenticated;
+revoke all on function public.push_tik() from public, anon, authenticated;
+
+select cron.schedule('weekplanning-meldingen', '*/5 * * * *', 'select public.push_tik()');
