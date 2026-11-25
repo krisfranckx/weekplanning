@@ -274,3 +274,33 @@ test('vaste activiteit met einddatum en verwijderen vanaf een datum', () => {
   // Bewaard na normaliseren
   assert.equal(L.normaliseer(JSON.parse(JSON.stringify(d))).week[2].activiteiten[0].tot, '2026-12-01');
 });
+
+test('schoolvakanties: officiële Vlaamse data en zomervakantie', () => {
+  assert.equal(L.vakantieOp('2026-12-21'), 'Kerstvakantie');
+  assert.equal(L.vakantieOp('2027-01-03'), 'Kerstvakantie');
+  assert.equal(L.vakantieOp('2027-01-04'), null);
+  assert.equal(L.vakantieOp('2026-11-11'), 'Wapenstilstand');
+  assert.equal(L.vakantieOp('2027-05-07'), 'Hemelvaart');
+  assert.equal(L.vakantieOp('2028-04-17'), 'Paasvakantie');
+  assert.equal(L.vakantieOp('2027-07-01'), 'Zomervakantie');
+  assert.equal(L.vakantieOp('2027-08-31'), 'Zomervakantie');
+  assert.equal(L.vakantieOp('2027-09-01'), null);
+  assert.equal(L.vakantieOp('2026-11-25'), null);
+});
+
+test('schoolvakanties: geen school, tenzij zelf "toch school" of uitgezet', () => {
+  const d = L.standaardData();
+  const kerst = new Date(2026, 11, 22); // dinsdag
+  let plan = L.dagPlan(d, kerst);
+  assert.equal(plan.school, false);
+  assert.equal(plan.vakantie, 'Kerstvakantie');
+  L.zetVeld(d, kerst, 'school', true, 'dag');
+  assert.equal(L.dagPlan(d, kerst).school, true);
+  L.herstelVeld(d, kerst, 'school');
+  d.vakanties = false;
+  plan = L.dagPlan(d, kerst);
+  assert.equal(plan.school, true);
+  assert.equal(plan.vakantie, null);
+  assert.equal(L.normaliseer(d).vakanties, false);
+  assert.equal(L.normaliseer({}).vakanties, true);
+});

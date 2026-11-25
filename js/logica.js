@@ -66,6 +66,49 @@
     return 1 + Math.round((d - plusDagen(eersteDonderdag, 3 - weekdagIndex(eersteDonderdag))) / (7 * 864e5));
   }
 
+  // ---------- Schoolvakanties en vrije dagen (Vlaanderen) ----------
+
+  /*
+   * Officiële data van vlaanderen.be (Schoolvakanties). [van, tot en met, naam].
+   * Zomervakantie (1 juli t/m 31 augustus) wordt per jaar berekend.
+   * Nieuwe schooljaren toevoegen zodra de overheid ze publiceert.
+   */
+  const VAKANTIES = [
+    ['2025-10-27', '2025-11-02', 'Herfstvakantie'], ['2025-11-11', '2025-11-11', 'Wapenstilstand'],
+    ['2025-12-22', '2026-01-04', 'Kerstvakantie'], ['2026-02-16', '2026-02-22', 'Krokusvakantie'],
+    ['2026-04-06', '2026-04-19', 'Paasvakantie'], ['2026-05-01', '2026-05-01', 'Dag van de Arbeid'],
+    ['2026-05-14', '2026-05-15', 'Hemelvaart'], ['2026-05-25', '2026-05-25', 'Pinkstermaandag'],
+
+    ['2026-11-02', '2026-11-08', 'Herfstvakantie'], ['2026-11-11', '2026-11-11', 'Wapenstilstand'],
+    ['2026-12-21', '2027-01-03', 'Kerstvakantie'], ['2027-02-08', '2027-02-14', 'Krokusvakantie'],
+    ['2027-03-29', '2027-04-11', 'Paasvakantie'], ['2027-05-06', '2027-05-07', 'Hemelvaart'],
+    ['2027-05-17', '2027-05-17', 'Pinkstermaandag'],
+
+    ['2027-11-01', '2027-11-07', 'Herfstvakantie'], ['2027-11-11', '2027-11-11', 'Wapenstilstand'],
+    ['2027-12-27', '2028-01-09', 'Kerstvakantie'], ['2028-02-28', '2028-03-05', 'Krokusvakantie'],
+    ['2028-04-03', '2028-04-17', 'Paasvakantie'], ['2028-05-01', '2028-05-01', 'Dag van de Arbeid'],
+    ['2028-05-25', '2028-05-26', 'Hemelvaart'], ['2028-06-05', '2028-06-05', 'Pinkstermaandag'],
+
+    ['2028-10-30', '2028-11-05', 'Herfstvakantie'],
+    ['2028-12-25', '2029-01-07', 'Kerstvakantie'], ['2029-02-12', '2029-02-18', 'Krokusvakantie'],
+    ['2029-04-02', '2029-04-15', 'Paasvakantie'], ['2029-05-01', '2029-05-01', 'Dag van de Arbeid'],
+    ['2029-05-10', '2029-05-11', 'Hemelvaart'], ['2029-05-21', '2029-05-21', 'Pinkstermaandag'],
+
+    ['2029-10-29', '2029-11-04', 'Herfstvakantie'],
+    ['2029-12-24', '2030-01-06', 'Kerstvakantie'], ['2030-03-04', '2030-03-10', 'Krokusvakantie'],
+    ['2030-04-08', '2030-04-22', 'Paasvakantie'], ['2030-05-01', '2030-05-01', 'Dag van de Arbeid'],
+    ['2030-05-30', '2030-05-31', 'Hemelvaart'], ['2030-06-10', '2030-06-10', 'Pinkstermaandag']
+  ];
+
+  /** Naam van de schoolvakantie of vrije dag op deze datum (Vlaanderen), of null. */
+  function vakantieOp(datum) {
+    const s = typeof datum === 'string' ? datum : datumSleutel(datum);
+    const md = s.slice(5);
+    if (md >= '07-01' && md <= '08-31') return 'Zomervakantie';
+    const v = VAKANTIES.find(x => s >= x[0] && s <= x[1]);
+    return v ? v[2] : null;
+  }
+
   // ---------- Data ----------
 
   function maakId() {
@@ -116,7 +159,7 @@
       }
       week.push(dag);
     }
-    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [], agendaWie: {}, agendaTekst: {} };
+    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [], agendaWie: {}, agendaTekst: {}, vakanties: true };
   }
 
   /** Vult ontbrekende velden aan, zodat oudere of geïmporteerde data blijft werken. */
@@ -139,6 +182,7 @@
         wie: t.wie || null, klaar: !!t.klaar
       }))
       : [];
+    uit.vakanties = data.vakanties !== false;
     uit.agendaWie = {};
     if (data.agendaWie && typeof data.agendaWie === 'object') {
       Object.keys(data.agendaWie).forEach(k => {
@@ -226,6 +270,9 @@
         plan[veld] = kopie(patroon[veld]);
       }
     });
+    // Schoolvakantie of vrije dag: geen school, tenzij je die dag zelf "toch school" zette.
+    plan.vakantie = data.vakanties !== false ? vakantieOp(sleutel) : null;
+    if (plan.vakantie && aanp.school === undefined) plan.school = false;
 
     const overslaan = aanp.overslaan || [];
     // Een vaste activiteit met een einddatum (tot en met) telt daarna niet meer mee.
@@ -712,7 +759,7 @@
     ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
     verschillen, voegWijzigingenToe,
-    WERKPLEKKEN, zetWerk, herstelWerk,
+    WERKPLEKKEN, zetWerk, herstelWerk, vakantieOp,
     agendaWieVoor, zetAgendaWie, wisAgendaWie, agendaTekstVoor, zetAgendaTekst,
     bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };

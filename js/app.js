@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '22 (25 nov 2026)';
+  const APP_VERSIE = '23 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -293,7 +293,8 @@
     const pijlen = [$('#vorige'), $('#volgende')];
     if (staat.scherm === 'dag') {
       titel.textContent = relatieveDag(staat.datum);
-      sub.textContent = L.datumLang(staat.datum);
+      const vak = staat.data.vakanties !== false && L.vakantieOp(staat.datum);
+      sub.textContent = L.datumLang(staat.datum) + (vak ? ' · ' + vak : '');
       pijlen.forEach(p => { p.hidden = false; });
     } else if (staat.scherm === 'week') {
       if (staat.weekModus === 'standaard') {
@@ -346,6 +347,12 @@
     if (!isVandaag) {
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
+    // Achterstallige todo's (alleen vandaag) helemaal bovenaan
+    const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
+    const telaat = todos.filter(t => t.telaat);
+    if (telaat.length) {
+      html += '<section class="kaart lijst dag-todos todo-telaat"><ul class="todos">' + telaat.map(t => todoRij(t, false)).join('') + '</ul></section>';
+    }
     // Thuis of op kantoor: niet in het weekend
     if (L.weekdagIndex(staat.datum) < 5) html += werkBalkHtml(plan);
     html += nieuwKaartHtml();
@@ -382,9 +389,9 @@
     html += '</section>';
 
     // Todo's: alleen als er voor deze dag zijn (toevoegen gaat via het tabblad Todo's)
-    const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
-    if (todos.length) {
-      html += '<section class="kaart lijst dag-todos"><ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
+    const opTijd = todos.filter(t => !t.telaat);
+    if (opTijd.length) {
+      html += '<section class="kaart lijst dag-todos"><ul class="todos">' + opTijd.map(t => todoRij(t, false)).join('') + '</ul></section>';
     }
 
     // Avondeten
@@ -399,7 +406,7 @@
 
     html += plan.school
       ? '<button class="link midden" data-actie="bewerk" data-veld="school">Geen school vandaag? (vakantie, vrije dag)</button>'
-      : plan.aangepast.school ? '<button class="link midden" data-actie="bewerk" data-veld="school">Toch school op deze dag?</button>' : '';
+      : plan.aangepast.school || plan.vakantie ? '<button class="link midden" data-actie="bewerk" data-veld="school">Toch school op deze dag?</button>' : '';
 
     inhoud.innerHTML = html;
   }
@@ -457,6 +464,7 @@
       html += '<li><button class="weekdag' + (isVandaag ? ' vandaag' : '') + '" data-actie="open-dag" data-datum="' + L.datumSleutel(datum) + '">' +
         '<span class="wd-datum"><strong>' + L.DAGEN_KORT[i] + '</strong>' + datum.getDate() + '</span>' +
         '<span class="wd-info">';
+      if (plan.vakantie) html += '<span class="wd-regel klein-grijs">' + ic('zon', 'mini') + e(plan.vakantie) + '</span>';
       if (plan.school) {
         html += '<span class="wd-regel">' + ic('rugzak', 'mini') + persoon(plan.brengen.wie, '?') + ic('school', 'mini') + persoon(plan.halen.wie, '?') + '</span>';
       }
@@ -684,6 +692,11 @@
         '" aria-label="' + e(g) + ' verwijderen">×</button></span>').join('') + '</div>' +
       '<form id="gerecht-toevoegen" class="rij-toevoegen"><input type="text" name="gerecht" placeholder="Nieuw gerecht" autocomplete="off" aria-label="Nieuw gerecht">' +
       '<button class="knop secundair" type="submit">Toevoegen</button></form></section>';
+
+    html += '<section class="kaart"><div class="kaart-kop"><span class="icoon">' + ic('zon') + '</span><h2>Schoolvakanties</h2></div>' +
+      '<label class="vinkje"><input type="checkbox" name="vakanties" data-instelling="vakanties"' + (staat.data.vakanties !== false ? ' checked' : '') + '> ' +
+      'Vlaamse schoolvakanties en vrije dagen automatisch</label>' +
+      '<p class="uitleg">Op die dagen valt brengen en ophalen vanzelf weg. Een pedagogische studiedag of andere vrije dag van jullie school zet je zelf via "Geen school vandaag?" onderaan de dag.</p></section>';
 
     html += deelKaartHtml();
     if (window.Sync && window.Sync.gebruiker()) html += agendaKaartHtml() + siriKaartHtml();
@@ -1043,9 +1056,12 @@
         '<label class="chip-keuze"><input type="radio" name="school" value="nee"' + (!plan.school ? ' checked' : '') + '><span>Geen school</span></label>' +
         '</div>';
     }
+    const vakantieDag = !alleenWeek && veld === 'school' && plan.vakantie;
     html += (alleenWeek
       ? '<input type="hidden" name="bereik" value="week"><p class="uitleg">Geldt voor elke ' + weekdagNaam(datum) + '.</p>'
-      : bereikKeuze(datum, 'dag')) + herstel + bladKnoppen();
+      : vakantieDag
+        ? '<input type="hidden" name="bereik" value="dag"><p class="uitleg">' + e(plan.vakantie) + ': normaal geen school. Dit geldt alleen voor ' + e(L.datumKort(datum)) + '.</p>'
+        : bereikKeuze(datum, 'dag')) + (vakantieDag ? '' : herstel) + bladKnoppen();
 
     openBlad(html, (form, knop) => {
       if (knop === 'herstel') {
@@ -1401,6 +1417,11 @@
     const doel = ev.target;
     if (doel.dataset && doel.dataset.todo) {
       vinkTodo(doel.dataset.todo, doel.checked);
+      return;
+    }
+    if (doel.dataset && doel.dataset.instelling === 'vakanties') {
+      staat.data.vakanties = doel.checked;
+      bewaar(doel.checked ? 'Schoolvakanties staan aan' : 'Schoolvakanties staan uit');
       return;
     }
     if (doel.id === 'importeer') {
