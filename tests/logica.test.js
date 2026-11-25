@@ -245,3 +245,30 @@ test('thuis of op kantoor: standaardweek en per dag', () => {
   assert.deepEqual(nieuw.aanpassingen, {});
   assert.deepEqual(L.normaliseer({ week: [{ werk: { ouder1: 'thuis', x: 'maan' } }] }).week[0].werk, { ouder1: 'thuis' });
 });
+
+test('vaste activiteit met einddatum en verwijderen vanaf een datum', () => {
+  const d = L.standaardData();
+  const over2 = L.plusDagen(woensdag, 14);
+  const zw = L.bewaarActiviteit(d, woensdag, { titel: 'Zwemmen', tijd: '14:00', wie: [], tot: L.datumSleutel(volgendeWoensdag) }, 'week');
+  assert.equal(zw.tot, '2026-12-02');
+  assert.equal(L.dagPlan(d, volgendeWoensdag).activiteiten.length, 1);
+  assert.equal(L.dagPlan(d, over2).activiteiten.length, 0);
+  // Eenmalig: geen einddatum
+  const t = L.bewaarActiviteit(d, woensdag, { titel: 'Tandarts', tot: '2027-01-01' }, 'dag');
+  assert.equal(t.tot, undefined);
+  // Einddatum weghalen
+  L.bewaarActiviteit(d, woensdag, Object.assign({}, zw, { tot: '' }), 'week');
+  assert.equal(L.dagPlan(d, over2).activiteiten.length, 1);
+
+  // Deze en alle volgende verwijderen: eerdere weken blijven
+  L.verwijderActiviteit(d, over2, 'onbestaand', 'volgende');
+  L.verwijderActiviteit(d, L.plusDagen(over2, 7), zw.id, 'dag'); // later overgeslagen
+  L.verwijderActiviteit(d, volgendeWoensdag, zw.id, 'volgende');
+  assert.deepEqual(L.dagPlan(d, woensdag).activiteiten.map(a => a.titel), ['Zwemmen', 'Tandarts']);
+  assert.equal(L.dagPlan(d, volgendeWoensdag).activiteiten.length, 0);
+  assert.equal(L.dagPlan(d, volgendeWoensdag).overgeslagen.length, 0);
+  assert.equal(L.dagPlan(d, over2).activiteiten.length, 0);
+  assert.equal(d.aanpassingen[L.datumSleutel(L.plusDagen(over2, 7))], undefined);
+  // Bewaard na normaliseren
+  assert.equal(L.normaliseer(JSON.parse(JSON.stringify(d))).week[2].activiteiten[0].tot, '2026-12-01');
+});

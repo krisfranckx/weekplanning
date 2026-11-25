@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '19 (25 nov 2026)';
+  const APP_VERSIE = '20 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -619,7 +619,8 @@
         '</div>';
       html += '<div class="sw-acts">' + dag.activiteiten.map(a =>
         '<button class="chip" data-actie="bewerk-vaste-activiteit" data-weekdag="' + i + '" data-id="' + e(a.id) + '">' +
-        e(a.tijd) + ' ' + e(a.titel) + '</button>').join('') +
+        e(a.tijd) + ' ' + e(a.titel) + (a.tot ? ' <span class="klein-grijs">t/m ' + e(L.datumKort(L.vanSleutel(a.tot))) + '</span>' : '') +
+        '</button>').join('') +
         '<button class="chip plus-chip" data-actie="nieuwe-vaste-activiteit" data-weekdag="' + i + '">' + ic('plus', 'mini') + 'Vaste activiteit</button></div>';
       html += '</section>';
     }
@@ -1110,11 +1111,16 @@
     } else {
       html += bereikKeuze(datum, isVast ? 'week' : 'dag');
     }
+    // Einddatum: alleen voor een activiteit die elke week terugkomt
+    const toonTot = vastOnly || isVast;
+    html += '<label class="veld tot-veld"' + (toonTot ? '' : ' hidden') + '>Tot en met (leeg = altijd)' +
+      '<input type="date" name="tot" value="' + e(act.tot || '') + '" min="' + L.datumSleutel(datum) + '"></label>';
     let extra = '';
     if (!nieuw) {
       extra = isVast && !vastOnly
-        ? '<button type="button" class="link gevaar" data-blad="sla-over">Niet op ' + L.datumKort(datum) + '</button>' +
-          '<button type="button" class="link gevaar" data-blad="wis">Elke week verwijderen</button>'
+        ? '<span class="wis-vraag">Verwijderen:</span>' +
+          '<button type="button" class="link gevaar" data-blad="sla-over">Alleen ' + L.datumKort(datum) + '</button>' +
+          '<button type="button" class="link gevaar" data-blad="wis-volgende">Ook alle volgende</button>'
         : '<button type="button" class="link gevaar" data-blad="wis">Verwijderen</button>';
     }
     html += bladKnoppen(extra);
@@ -1123,6 +1129,11 @@
       if (knop === 'sla-over') {
         L.verwijderActiviteit(staat.data, datum, act.id, 'dag');
         bewaar('Overgeslagen op ' + L.datumKort(datum));
+        return;
+      }
+      if (knop === 'wis-volgende') {
+        L.verwijderActiviteit(staat.data, datum, act.id, 'volgende');
+        bewaar('Verwijderd vanaf ' + L.datumKort(datum));
         return;
       }
       if (knop === 'wis') {
@@ -1134,8 +1145,11 @@
       const titel = (f.get('titel') || '').trim();
       if (!titel) return false;
       const bereik = vastOnly ? 'week' : f.get('bereik');
-      L.bewaarActiviteit(staat.data, datum, { id: act.id, titel: titel, tijd: f.get('tijd'), wie: f.getAll('wie') }, bereik);
-      bewaar(bereik === 'week' ? 'Opgeslagen voor elke ' + weekdagNaam(datum) : 'Opgeslagen voor ' + L.datumKort(datum));
+      const tot = bereik === 'week' ? (f.get('tot') || '') : '';
+      L.bewaarActiviteit(staat.data, datum, { id: act.id, titel: titel, tijd: f.get('tijd'), wie: f.getAll('wie'), tot: tot }, bereik);
+      bewaar(bereik === 'week'
+        ? 'Opgeslagen voor elke ' + weekdagNaam(datum) + (tot ? ' tot en met ' + L.datumKort(L.vanSleutel(tot)) : '')
+        : 'Opgeslagen voor ' + L.datumKort(datum));
     });
   }
 
@@ -1144,6 +1158,13 @@
     if (bladActie && bladActie(bladForm, 'ok') === false) return;
     sluitBlad();
     teken();
+  });
+
+  // Einddatum alleen tonen als de activiteit elke week terugkomt
+  bladForm.addEventListener('change', ev => {
+    if (ev.target.name !== 'bereik') return;
+    const veld = bladForm.querySelector('.tot-veld');
+    if (veld) veld.hidden = ev.target.value !== 'week';
   });
 
   bladForm.addEventListener('input', ev => {

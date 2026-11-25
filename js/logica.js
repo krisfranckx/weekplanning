@@ -228,12 +228,14 @@
     });
 
     const overslaan = aanp.overslaan || [];
-    const vast = patroon.activiteiten
+    // Een vaste activiteit met een einddatum (tot en met) telt daarna niet meer mee.
+    const lopend = patroon.activiteiten.filter(a => !a.tot || sleutel <= a.tot);
+    const vast = lopend
       .filter(a => !overslaan.includes(a.id))
       .map(a => Object.assign(kopie(a), { eenmalig: false }));
     const extra = (aanp.extra || []).map(a => Object.assign(kopie(a), { eenmalig: true }));
     plan.activiteiten = sorteerOpTijd(vast.concat(extra));
-    plan.overgeslagen = patroon.activiteiten.filter(a => overslaan.includes(a.id)).map(kopie);
+    plan.overgeslagen = lopend.filter(a => overslaan.includes(a.id)).map(kopie);
     plan.werk = geldigWerk(Object.assign({}, patroon.werk, aanp.werk));
     plan.aangepast.werk = Object.keys(aanp.werk || {});
     if (!plan.aangepast.werk.length) delete plan.aangepast.werk;
@@ -283,7 +285,7 @@
 
   /**
    * Activiteit toevoegen of wijzigen.
-   * bereik 'week' = vaste activiteit, elke week op deze weekdag
+   * bereik 'week' = vaste activiteit, elke week op deze weekdag (optioneel tot en met activiteit.tot)
    * bereik 'dag'  = eenmalig op deze datum
    */
   function bewaarActiviteit(data, datum, activiteit, bereik) {
@@ -295,6 +297,7 @@
       titel: (activiteit.titel || '').trim(),
       wie: Array.isArray(activiteit.wie) ? activiteit.wie.slice() : []
     };
+    if (bereik === 'week' && /^\d{4}-\d{2}-\d{2}$/.test(activiteit.tot || '')) act.tot = activiteit.tot;
     const isVast = patroon.activiteiten.some(a => a.id === act.id);
 
     if (isVast && bereik === 'dag') {
@@ -325,7 +328,8 @@
 
   /**
    * Activiteit verwijderen.
-   * Voor een vaste activiteit: bereik 'dag' slaat ze enkel deze datum over, 'week' verwijdert ze echt.
+   * Voor een vaste activiteit: bereik 'dag' slaat ze enkel deze datum over, 'volgende' stopt ze
+   * vanaf deze datum (eerdere weken blijven staan), 'week' verwijdert ze helemaal.
    */
   function verwijderActiviteit(data, datum, id, bereik) {
     const sleutel = datumSleutel(datum);
@@ -336,6 +340,15 @@
     } else if (patroon.activiteiten.some(a => a.id === id)) {
       if (bereik === 'week') {
         patroon.activiteiten = patroon.activiteiten.filter(a => a.id !== id);
+      } else if (bereik === 'volgende') {
+        const act = patroon.activiteiten.find(a => a.id === id);
+        act.tot = datumSleutel(plusDagen(datum, -1));
+        // Overgeslagen of eenmalig verplaatste keren vanaf deze datum zijn niet meer nodig.
+        Object.keys(data.aanpassingen).filter(k => k >= sleutel).forEach(k => {
+          const a = data.aanpassingen[k];
+          if (a.overslaan) a.overslaan = a.overslaan.filter(x => x !== id);
+          ruimLegeAanpassingOp(data, k);
+        });
       } else {
         const a = aanpassingVoor(data, sleutel);
         a.overslaan = (a.overslaan || []).concat([id]);
