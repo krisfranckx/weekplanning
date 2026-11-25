@@ -120,5 +120,7 @@ test('oude standaardnamen worden vervangen, aangepaste niet', () => {
   ], week: [] };
   assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Kris', 'Eva', 'Pablo', 'Polly', 'Louis']);
   oud.leden[0].naam = 'Jan';
-  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Jan', 'Ouder 2', 'Kind 1', 'Kind 2']);
+  assert.deepEqual(L.normaliseer(oud).leden.map(l => l.naam), ['Jan', 'Eva', 'Pablo', 'Polly', 'Louis']);
+  const zelfGedaan = { leden: oud.leden.map((l, i) => Object.assign({}, l, { naam: 'X' + i })), week: [] };
+  assert.deepEqual(L.normaliseer(zelfGedaan).leden.map(l => l.naam), ['X0', 'X1', 'X2', 'X3']);
 });

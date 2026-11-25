@@ -4,6 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
+  const APP_VERSIE = '3 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -346,7 +347,8 @@
       '<label class="knop secundair">Importeren<input type="file" id="importeer" accept="application/json,.json" hidden></label>' +
       '</div>' +
       '<button class="link gevaar" data-actie="alles-wissen">Alles wissen en opnieuw beginnen</button>' +
-      '</section>';
+      '</section>' +
+      '<p class="uitleg midden-tekst">Versie ' + APP_VERSIE + '</p>';
     inhoud.innerHTML = html;
   }
 
@@ -770,7 +772,7 @@
 
   // Offline werken en "zet op beginscherm"
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   }
 
   // Persoonlijke link met namen: #gezin=ouders:A,B;kinderen:C,D

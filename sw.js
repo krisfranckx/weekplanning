@@ -1,10 +1,10 @@
 /* Eenvoudige service worker: eerst het netwerk proberen, anders de bewaarde kopie (offline). */
-const CACHE = 'weekplanning-v2';
+const CACHE = 'weekplanning-v3';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 const BESTANDEN = ['./', 'index.html', 'css/stijl.css', 'js/logica.js', 'js/app.js', 'manifest.webmanifest', 'icoon.svg', 'js/sync.js'];
 
 self.addEventListener('install', ev => {
-  ev.waitUntil(caches.open(CACHE).then(c => c.addAll(BESTANDEN)).then(() => self.skipWaiting()));
+  ev.waitUntil(caches.open(CACHE).then(c => c.addAll(BESTANDEN.map(b => new Request(b, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', ev => {
@@ -28,7 +28,11 @@ self.addEventListener('fetch', ev => {
   }
   if (new URL(ev.request.url).origin !== location.origin) return;
   ev.respondWith(
-    fetch(ev.request)
+    // cache: 'no-cache' = altijd bij de server navragen of er een nieuwere versie is
+    // (anders houdt de browser oude bestanden tot 10 minuten vast).
+    fetch(ev.request.mode === 'navigate'
+      ? new Request(ev.request.url, { cache: 'no-cache', credentials: 'same-origin' })
+      : new Request(ev.request, { cache: 'no-cache' }))
       .then(antwoord => {
         const kopie = antwoord.clone();
         caches.open(CACHE).then(c => c.put(ev.request, kopie));
