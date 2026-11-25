@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '12 (25 nov 2026)';
+  const APP_VERSIE = '13 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -223,7 +223,8 @@
     if (!isVandaag) {
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
-    html += werkBalkHtml(plan);
+    // Thuis of op kantoor: niet in het weekend
+    if (L.weekdagIndex(staat.datum) < 5) html += werkBalkHtml(plan);
     html += nieuwKaartHtml();
 
     if (plan.school) {
@@ -231,11 +232,6 @@
         schoolRij('brengen', ic('rugzak'), 'Brengen', plan.brengen, plan.aangepast.brengen) +
         schoolRij('halen', ic('school'), 'Ophalen', plan.halen, plan.aangepast.halen) +
         '</section>';
-    } else {
-      html +=
-        '<button class="kaart geen-school" data-actie="bewerk" data-veld="school">' +
-        '<span class="icoon">' + ic('wolk') + '</span><span><strong>Geen school</strong>' +
-        '<small>' + (plan.aangepast.school ? 'Alleen vandaag. ' : '') + 'Tik om te wijzigen</small></span></button>';
     }
 
     // Activiteiten
@@ -272,9 +268,9 @@
       (plan.eten.kok ? '<p class="klein-grijs">Kookt: ' + persoon(plan.eten.kok) + '</p>' : '') +
       '</button>';
 
-    if (plan.school) {
-      html += '<button class="link midden" data-actie="bewerk" data-veld="school">Geen school vandaag? (vakantie, vrije dag)</button>';
-    }
+    html += plan.school
+      ? '<button class="link midden" data-actie="bewerk" data-veld="school">Geen school vandaag? (vakantie, vrije dag)</button>'
+      : plan.aangepast.school ? '<button class="link midden" data-actie="bewerk" data-veld="school">Toch school op deze dag?</button>' : '';
 
     inhoud.innerHTML = html;
   }
@@ -339,8 +335,6 @@
         '<span class="wd-info">';
       if (plan.school) {
         html += '<span class="wd-regel">' + ic('rugzak', 'mini') + persoon(plan.brengen.wie, '?') + ic('school', 'mini') + persoon(plan.halen.wie, '?') + '</span>';
-      } else {
-        html += '<span class="wd-regel klein-grijs">Geen school</span>';
       }
       if (plan.activiteiten.length) {
         html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + plan.activiteiten.map(a => e(a.titel)).join(', ') + '</span>';
