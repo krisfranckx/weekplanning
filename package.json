@@ -5,6 +5,7 @@
   "description": "Gezinsweekplanning: wie brengt, wie haalt, activiteiten en avondeten.",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "bouw-meldingen": "node scripts/bouw-meldingen.js"
   }
 }
