@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '18 (25 nov 2026)';
+  const APP_VERSIE = '19 (25 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -352,8 +352,8 @@
 
     if (plan.school) {
       html += '<section class="kaart school-kaart">' +
-        schoolRij('brengen', ic('rugzak'), 'Brengen', plan.brengen, plan.aangepast.brengen) +
-        schoolRij('halen', ic('school'), 'Ophalen', plan.halen, plan.aangepast.halen) +
+        schoolRij('brengen', ic('rugzak'), 'Brengen', plan.brengen) +
+        schoolRij('halen', ic('school'), 'Ophalen', plan.halen) +
         '</section>';
     }
 
@@ -415,19 +415,17 @@
   function werkBalkHtml(plan) {
     const lijst = ouders();
     if (!lijst.length) return '';
-    const aangepast = plan.aangepast.werk || [];
     return '<div class="werkbalk" style="--aantal:' + lijst.length + '">' + lijst.map(l => {
       const w = plan.werk[l.id];
       return '<button class="kaart werk getint' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) +
         '" style="--kleur:' + e(l.kleur) + '" aria-label="' + e(l.naam) + ': ' + e(w ? WERK_TEKST[w] : 'niet ingevuld') + '" title="' + e(l.naam) + '">' +
-        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') +
-        (aangepast.includes(l.id) ? '<span class="stipje" title="Alleen deze dag"></span>' : '') + '</span>' +
+        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') + '</span>' +
         '</button>';
     }).join('') + '</div>';
   }
 
   /** Brengen of ophalen als één compacte regel. */
-  function schoolRij(veld, icoon, label, deel, aangepast) {
+  function schoolRij(veld, icoon, label, deel) {
     const lid = L.lid(staat.data, deel.wie);
     return '<button class="school-rij' + (lid ? ' getint' : ' leeg') + '" data-actie="bewerk" data-veld="' + veld + '"' +
       (lid ? ' style="--kleur:' + e(lid.kleur) + '" title="' + e(lid.naam) + '"' : '') +
@@ -436,7 +434,6 @@
       '<span class="school-label">' + label + '</span>' +
       '<span class="school-tijd">' + e(deel.tijd || '') + '</span>' +
       (lid ? '' : '<span class="school-wie">Nog niemand</span>') +
-      (aangepast ? '<span class="stipje" title="Alleen deze dag"></span>' : '') +
       '</button>';
   }
 
@@ -457,8 +454,6 @@
       const datum = L.plusDagen(staat.weekStart, i);
       const plan = L.dagPlan(staat.data, datum);
       const isVandaag = L.zelfdeDag(datum, vandaag());
-      const aangepast = Object.keys(plan.aangepast).length > 0 || plan.overgeslagen.length > 0 ||
-        plan.activiteiten.some(a => a.eenmalig);
       html += '<li><button class="weekdag' + (isVandaag ? ' vandaag' : '') + '" data-actie="open-dag" data-datum="' + L.datumSleutel(datum) + '">' +
         '<span class="wd-datum"><strong>' + L.DAGEN_KORT[i] + '</strong>' + datum.getDate() + '</span>' +
         '<span class="wd-info">';
@@ -475,9 +470,9 @@
           t.klaar ? '<s>' + e(t.titel) + '</s>' : e(t.titel)).join(', ') + '</span>';
       }
       html += '<span class="wd-regel klein-grijs">' + ic('bestek', 'mini') + (plan.eten.wat ? e(plan.eten.wat) : '–') + '</span>';
-      html += '</span>' + (aangepast ? '<span class="stip" title="Aangepast"></span>' : '') + '</button></li>';
+      html += '</span></button></li>';
     }
-    html += '</ul><p class="uitleg">Tik op een dag om hem te bekijken of aan te passen. Een stip betekent dat die dag afwijkt van de standaardweek.</p>';
+    html += '</ul><p class="uitleg">Tik op een dag om hem te bekijken of aan te passen.</p>';
     return html;
   }
 
