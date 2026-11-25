@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2e86ab">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101217" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Weekplanning">
   <title>Weekplanning</title>
@@ -14,21 +15,25 @@
 </head>
 <body>
   <header class="kop">
-    <button class="pijl" id="vorige" aria-label="Vorige">‹</button>
     <div class="kop-midden">
-      <h1 id="titel">Vandaag</h1>
       <p id="subtitel"></p>
-      <button id="deelstatus" class="deelstatus" hidden></button>
+      <h1 id="titel">Vandaag</h1>
     </div>
-    <button class="pijl" id="volgende" aria-label="Volgende">›</button>
+    <div class="kop-rechts">
+      <button id="deelstatus" class="deelstatus" hidden></button>
+      <div class="pijlen">
+        <button class="pijl" id="vorige" aria-label="Vorige" data-icoon="terug"></button>
+        <button class="pijl" id="volgende" aria-label="Volgende" data-icoon="verder"></button>
+      </div>
+    </div>
   </header>
 
   <main id="inhoud" aria-live="polite"></main>
 
   <nav class="tabs" aria-label="Schermen">
-    <button data-scherm="dag" class="actief"><span aria-hidden="true">☀️</span>Vandaag</button>
-    <button data-scherm="week"><span aria-hidden="true">🗓️</span>Week</button>
-    <button data-scherm="gezin"><span aria-hidden="true">👪</span>Gezin</button>
+    <button data-scherm="dag" class="actief"><span class="tab-ic" data-icoon="zon"></span>Vandaag</button>
+    <button data-scherm="week"><span class="tab-ic" data-icoon="kalender"></span>Week</button>
+    <button data-scherm="gezin"><span class="tab-ic" data-icoon="gezin"></span>Gezin</button>
   </nav>
 
   <dialog id="blad" class="blad">
@@ -38,6 +43,7 @@
   <div id="melding" class="melding" role="status" hidden></div>
 
   <script src="js/logica.js"></script>
+  <script src="js/iconen.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
 </body>
