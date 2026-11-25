@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '10 (25 nov 2026)';
+  const APP_VERSIE = '11 (25 nov 2026)';
 
   // ---------- Toestand ----------
 
@@ -223,14 +223,14 @@
     if (!isVandaag) {
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
+    html += werkBalkHtml(plan);
     html += nieuwKaartHtml();
 
     if (plan.school) {
-      html +=
-        '<div class="rij-twee">' +
-        kaart('brengen', ic('rugzak'), 'Naar school brengen', persoon(plan.brengen.wie), plan.brengen.tijd, plan.aangepast.brengen) +
-        kaart('halen', ic('school'), 'Ophalen van school', persoon(plan.halen.wie), plan.halen.tijd, plan.aangepast.halen) +
-        '</div>';
+      html += '<section class="kaart school-kaart">' +
+        schoolRij('brengen', ic('rugzak'), 'Brengen', plan.brengen, plan.aangepast.brengen) +
+        schoolRij('halen', ic('school'), 'Ophalen', plan.halen, plan.aangepast.halen) +
+        '</section>';
     } else {
       html +=
         '<button class="kaart geen-school" data-actie="bewerk" data-veld="school">' +
@@ -248,7 +248,6 @@
         '<li><button data-actie="bewerk-activiteit" data-id="' + e(a.id) + '">' +
         '<span class="tijd">' + e(a.tijd || '–') + '</span>' +
         '<span class="act-tekst"><strong>' + e(a.titel) + '</strong>' +
-        (a.eenmalig ? ' <span class="badge">eenmalig</span>' : '') +
         '<span class="act-wie">' + personen(a.wie) + '</span></span></button></li>'
       ).join('') + '</ul>';
     }
@@ -259,14 +258,12 @@
     }
     html += '</section>';
 
-    // Todo's
+    // Todo's: alleen als er voor deze dag zijn (toevoegen gaat via het tabblad Todo's)
     const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
-    html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('vinkje') + '</span><h2>Todo\'s</h2>' +
-      '<button class="plus" data-actie="nieuwe-todo" data-datum="' + L.datumSleutel(staat.datum) + '" aria-label="Todo toevoegen">' + ic('plus') + '</button></div>';
-    html += todos.length
-      ? '<ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul>'
-      : '<p class="leeg-tekst">Geen todo\'s met deadline ' + (isVandaag ? 'vandaag' : 'op deze dag') + '.</p>';
-    html += '</section>';
+    if (todos.length) {
+      html += '<section class="kaart lijst"><div class="kaart-kop"><span class="icoon">' + ic('vinkje') + '</span><h2>Todo\'s</h2></div>' +
+        '<ul class="todos">' + todos.map(t => todoRij(t, false)).join('') + '</ul></section>';
+    }
 
     // Avondeten
     html += '<button class="kaart eten" data-actie="bewerk" data-veld="eten">' +
@@ -282,11 +279,36 @@
     inhoud.innerHTML = html;
   }
 
-  function kaart(veld, icoon, label, wieHtml, tijd, aangepast) {
-    return '<button class="kaart taak" data-actie="bewerk" data-veld="' + veld + '">' +
-      '<div class="kaart-kop"><span class="icoon">' + icoon + '</span><h2>' + label + '</h2></div>' +
-      '<div class="taak-wie">' + wieHtml + '</div>' +
-      '<div class="taak-onder"><span class="tijd">' + (tijd ? ic('klok') + e(tijd) : '') + '</span>' + badge(aangepast) + '</div>' +
+  const WERK_TEKST = { thuis: 'Thuis', kantoor: 'Op kantoor', vrij: 'Vrij' };
+  const WERK_ICOON = { thuis: 'huis', kantoor: 'kantoor', vrij: 'zon' };
+
+  function ouders() {
+    return staat.data.leden.filter(l => l.rol === 'ouder');
+  }
+
+  /** Bovenaan: waar werkt elke ouder vandaag? */
+  function werkBalkHtml(plan) {
+    const lijst = ouders();
+    if (!lijst.length) return '';
+    const aangepast = plan.aangepast.werk || [];
+    return '<div class="werkbalk" style="--aantal:' + lijst.length + '">' + lijst.map(l => {
+      const w = plan.werk[l.id];
+      return '<button class="kaart werk' + (w ? ' werk-' + w : ' werk-leeg') + '" data-actie="bewerk-werk" data-id="' + e(l.id) + '">' +
+        '<span class="persoon" style="--kleur:' + e(l.kleur) + '"><i>' + initiaal(l.naam) + '</i>' + e(l.naam) + '</span>' +
+        '<span class="werk-plek">' + (w ? ic(WERK_ICOON[w]) + WERK_TEKST[w] : 'Niet ingevuld') +
+        (aangepast.includes(l.id) ? '<span class="stipje" title="Alleen deze dag"></span>' : '') + '</span>' +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  /** Brengen of ophalen als één compacte regel. */
+  function schoolRij(veld, icoon, label, deel, aangepast) {
+    return '<button class="school-rij" data-actie="bewerk" data-veld="' + veld + '">' +
+      '<span class="school-ic">' + icoon + '</span>' +
+      '<span class="school-label">' + label + '</span>' +
+      '<span class="school-tijd">' + e(deel.tijd || '') + '</span>' +
+      '<span class="school-wie">' + persoon(deel.wie, 'Nog niemand') + '</span>' +
+      (aangepast ? '<span class="stipje" title="Alleen deze dag"></span>' : '') +
       '</button>';
   }
 
@@ -459,6 +481,13 @@
           '<label>om<input type="time" name="halen.tijd" value="' + e(dag.halen.tijd) + '"></label>' +
           '</div>';
       }
+      if (ouders().length) {
+        html += '<div class="sw-raster">' + ouders().map(l =>
+          '<label>' + e(l.naam) + ' werkt<select name="werk.' + e(l.id) + '">' +
+          '<option value="">–</option>' +
+          L.WERKPLEKKEN.map(w => '<option value="' + w + '"' + (dag.werk[l.id] === w ? ' selected' : '') + '>' + WERK_TEKST[w] + '</option>').join('') +
+          '</select></label>').join('') + '</div>';
+      }
       html += '<div class="sw-raster">' +
         '<button type="button" class="eten-knop breed" data-actie="bewerk-std-eten" data-weekdag="' + i + '">' +
         '<span class="klein-grijs">' + ic('bestek', 'mini') + 'Avondeten</span>' +
@@ -491,6 +520,11 @@
       dag.school = doel.checked;
       bewaar('Opgeslagen voor elke ' + L.DAGEN[i]);
       tekenWeek();
+      return;
+    }
+    if (veld === 'werk') {
+      L.zetWerk(staat.data, datumVoorWeekdag(i), sub, doel.value, 'week');
+      bewaar('Opgeslagen voor elke ' + L.DAGEN[i]);
       return;
     }
     let waarde = doel.value;
@@ -833,6 +867,33 @@
     });
   }
 
+  function bewerkWerk(lidId) {
+    const lid = L.lid(staat.data, lidId);
+    if (!lid) return;
+    const datum = staat.datum;
+    const plan = L.dagPlan(staat.data, datum);
+    const huidig = plan.werk[lidId] || '';
+    const aangepast = (plan.aangepast.werk || []).includes(lidId);
+    let html = '<h2>' + ic('huis') + 'Waar werkt ' + e(lid.naam) + '?</h2><div class="chips">' +
+      L.WERKPLEKKEN.map(w => '<label class="chip-keuze"><input type="radio" name="werk" value="' + w + '"' + (huidig === w ? ' checked' : '') +
+        '><span>' + ic(WERK_ICOON[w]) + WERK_TEKST[w] + '</span></label>').join('') +
+      '<label class="chip-keuze"><input type="radio" name="werk" value=""' + (!huidig ? ' checked' : '') + '><span>Niet ingevuld</span></label>' +
+      '</div>' + bereikKeuze(datum, 'dag') +
+      (aangepast ? '<button type="button" class="link" data-blad="herstel">Terug naar standaardweek</button>' : '') +
+      bladKnoppen();
+    openBlad(html, (form, knop) => {
+      if (knop === 'herstel') {
+        L.herstelWerk(staat.data, datum, lidId);
+        bewaar('Terug zoals in de standaardweek');
+        return;
+      }
+      const f = new FormData(form);
+      const bereik = f.get('bereik');
+      L.zetWerk(staat.data, datum, lidId, f.get('werk'), bereik);
+      bewaar(bereik === 'week' ? 'Opgeslagen voor elke ' + weekdagNaam(datum) : 'Opgeslagen voor ' + L.datumKort(datum));
+    });
+  }
+
   /**
    * Activiteit bewerken. `vastOnly` = bewerken vanuit de standaardweek (altijd "elke week").
    */
@@ -950,6 +1011,9 @@
         break;
       case 'bewerk':
         bewerkVeld(knop.dataset.veld);
+        break;
+      case 'bewerk-werk':
+        bewerkWerk(knop.dataset.id);
         break;
       case 'bewerk-std-eten':
         bewerkVeld('eten', Number(knop.dataset.weekdag));

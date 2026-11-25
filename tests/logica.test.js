@@ -217,3 +217,31 @@ test("todo's in het wijzigingsoverzicht", () => {
   L.zetTodoKlaar(later, t.id, true);
   assert.deepEqual(L.verschillen(nieuw, later, woensdag, 14).map(x => x.tekst), ['Afgevinkt: Turnzak']);
 });
+
+test('thuis of op kantoor: standaardweek en per dag', () => {
+  const d = L.standaardData();
+  assert.deepEqual(L.dagPlan(d, woensdag).werk, {});
+  L.zetWerk(d, woensdag, 'ouder1', 'kantoor', 'week');
+  L.zetWerk(d, woensdag, 'ouder2', 'thuis', 'week');
+  assert.deepEqual(L.dagPlan(d, volgendeWoensdag).werk, { ouder1: 'kantoor', ouder2: 'thuis' });
+  // Enkel deze woensdag werkt Kris thuis
+  L.zetWerk(d, woensdag, 'ouder1', 'thuis', 'dag');
+  let plan = L.dagPlan(d, woensdag);
+  assert.deepEqual(plan.werk, { ouder1: 'thuis', ouder2: 'thuis' });
+  assert.deepEqual(plan.aangepast.werk, ['ouder1']);
+  assert.equal(L.dagPlan(d, volgendeWoensdag).werk.ouder1, 'kantoor');
+  // Eva enkel deze dag leeg maken
+  L.zetWerk(d, woensdag, 'ouder2', '', 'dag');
+  assert.deepEqual(L.dagPlan(d, woensdag).werk, { ouder1: 'thuis' });
+  L.herstelWerk(d, woensdag, 'ouder1');
+  L.herstelWerk(d, woensdag, 'ouder2');
+  assert.deepEqual(d.aanpassingen, {});
+  // Wijzigingsoverzicht
+  const nieuw = L.normaliseer(JSON.parse(JSON.stringify(d)));
+  L.zetWerk(nieuw, woensdag, 'ouder2', 'vrij', 'dag');
+  assert.deepEqual(L.verschillen(d, nieuw, woensdag, 1).map(x => x.tekst), ['Eva: vrij']);
+  // Lid verwijderen ruimt op; normaliseer houdt enkel geldige waarden
+  L.verwijderLid(nieuw, 'ouder2');
+  assert.deepEqual(nieuw.aanpassingen, {});
+  assert.deepEqual(L.normaliseer({ week: [{ werk: { ouder1: 'thuis', x: 'maan' } }] }).week[0].werk, { ouder1: 'thuis' });
+});

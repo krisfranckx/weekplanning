@@ -5,7 +5,8 @@ wie brengt de kinderen naar school, wie haalt ze op, welke activiteiten er zijn 
 
 ## Zo werkt het
 
-- **Vandaag**: tik op een kaart (brengen, ophalen, avondeten) om ze aan te passen. Kies daarna
+- **Vandaag**: bovenaan zie je of elke ouder thuis werkt, op kantoor of vrij is (tik om te wijzigen,
+  vast instellen kan in de standaardweek). Tik op een kaart (brengen, ophalen, avondeten) om ze aan te passen. Kies daarna
   *Alleen vandaag* of *Elke woensdag* (of welke dag het ook is). Met ‹ › of door te vegen ga je naar
   een andere dag.
 - **Week**: *Deze week* toont de zeven dagen in één oogopslag. Een oranje stip betekent dat die dag
@@ -15,7 +16,7 @@ wie brengt de kinderen naar school, wie haalt ze op, welke activiteiten er zijn 
 - **Todo's**: taken met een deadline en een persoon, die je kan afvinken. Ze staan gegroepeerd
   (te laat, vandaag, deze week, later) en je kan filteren per persoon. Op de dag van de deadline
   verschijnen ze ook in *Vandaag* en *Week*, onder de activiteiten. Open todo's die te laat zijn,
-  blijven op *Vandaag* staan tot ze afgevinkt zijn.
+  blijven op *Vandaag* staan tot ze afgevinkt zijn. Todo's toevoegen gaat via dit tabblad.
 - **Gezin**: namen, kleuren en extra personen (grootouders, oppas, opvang). Hier kan je ook
   exporteren en importeren.
 
