@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '4 (25 nov 2026)';
+  const APP_VERSIE = '5 (25 nov 2026)';
 
   // ---------- Toestand ----------
 

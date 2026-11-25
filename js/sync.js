@@ -120,12 +120,17 @@
 
   function meldFout(fout) {
     const tekst = (fout && fout.message) || String(fout);
-    if (!navigator.onLine || /fetch|network|Failed/i.test(tekst)) {
+    const code = fout && fout.code;
+    if (!navigator.onLine || /Failed to fetch|NetworkError|network/i.test(tekst)) {
       zetStatus('offline', 'Offline: wordt gedeeld zodra er verbinding is');
-    } else if (/row-level security|permission|42501/i.test(tekst)) {
-      zetStatus('fout', 'Geen toegang: staat je e-mailadres in de tabel "toegelaten"?');
+    } else if (/permission denied/i.test(tekst)) {
+      // Tabelrechten ontbreken (nieuwere Supabase-projecten geven die niet meer automatisch).
+      zetStatus('fout', 'Geen rechten op de tabel: voer supabase/opzet.sql opnieuw uit (' + tekst + ')');
+    } else if (/row-level security/i.test(tekst) || code === '42501') {
+      const wie = gebruiker && gebruiker.email ? gebruiker.email : 'je e-mailadres';
+      zetStatus('fout', 'Geen toegang: staat ' + wie + ' exact zo in de tabel "toegelaten"?');
     } else {
-      zetStatus('fout', 'Delen mislukt: ' + tekst);
+      zetStatus('fout', 'Delen mislukt: ' + tekst + (code ? ' (' + code + ')' : ''));
     }
     console.warn('Synchronisatie:', fout);
   }

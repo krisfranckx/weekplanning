@@ -29,7 +29,7 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.toegelaten
-    where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    where lower(trim(email)) = lower(trim(coalesce(auth.jwt() ->> 'email', '')))
   );
 $$;
 
@@ -44,6 +44,15 @@ create policy "gezin maakt aan" on public.planning
   for insert to authenticated with check (public.is_toegelaten());
 create policy "gezin wijzigt" on public.planning
   for update to authenticated using (public.is_toegelaten()) with check (public.is_toegelaten());
+
+-- 4b. Rechten voor ingelogde gebruikers.
+-- Nieuwere Supabase-projecten geven die niet meer automatisch; zonder dit krijg je "Geen toegang".
+-- De policies hierboven bepalen daarna wie welke rij mag zien.
+grant usage on schema public to authenticated;
+grant select, insert, update on public.planning to authenticated;
+revoke all on public.planning from anon;
+revoke all on public.toegelaten from anon, authenticated;
+grant execute on function public.is_toegelaten() to authenticated;
 
 -- 5. Live updates aanzetten voor de planning
 do $$
@@ -61,3 +70,6 @@ insert into public.toegelaten (email) values
   ('jouw.adres@voorbeeld.be'),
   ('adres.partner@voorbeeld.be')
 on conflict do nothing;
+
+-- Spaties en hoofdletters in de lijst gelijkzetten
+update public.toegelaten set email = lower(trim(email)) where email <> lower(trim(email));

@@ -75,5 +75,17 @@ Tip: tik in de browser op **Delen** > **Zet op beginscherm**, dan opent de app a
   online komt. In de praktijk gebeurt dat zelden.
 - **Gratis niveau**: Supabase pauzeert een gratis project na een week zonder gebruik. Gebruik je de
   app dagelijks, dan merk je daar niets van. Gepauzeerd? Log in op supabase.com en klik op **Restore**.
-- **Problemen?** Zie je *Geen toegang*, kijk dan of je e-mailadres exact zo in de tabel `toegelaten`
-  staat (**Table Editor** > `toegelaten`).
+- **Problemen?** Zie de volgende sectie.
+
+## "Geen toegang" of "Geen rechten op de tabel"
+
+1. **Script opnieuw uitvoeren.** Open **SQL Editor**, plak de nieuwste versie van
+   [`supabase/opzet.sql`](supabase/opzet.sql) (met jullie e-mailadressen onderaan) en klik op **Run**.
+   Nieuwere Supabase-projecten geven ingelogde gebruikers niet meer automatisch rechten op een
+   nieuwe tabel; het script regelt dat nu.
+2. **Zelfde adres?** De app toont bij *Gezin > Samen delen* met welk adres je ingelogd bent. Vergelijk
+   dat met **Authentication** > **Users** en met **Table Editor** > `toegelaten`. Een tikfout of een
+   ander adres (bv. werk/privé) is de meest voorkomende oorzaak.
+3. **Bevestigd?** Staat er bij **Authentication** > **Users** *Waiting for verification*, klik dan op
+   de link in de bevestigingsmail (of zet *Confirm email* uit, zie stap 3 hierboven).
+4. Sluit de app en open hem opnieuw.
