@@ -115,7 +115,7 @@
       }
       week.push(dag);
     }
-    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice() };
+    return { versie: VERSIE, leden: leden, week: week, aanpassingen: {}, gerechten: STANDAARD_GERECHTEN.slice(), todos: [] };
   }
 
   /** Vult ontbrekende velden aan, zodat oudere of geïmporteerde data blijft werken. */
@@ -132,6 +132,12 @@
     uit.gerechten = Array.isArray(data.gerechten)
       ? data.gerechten.filter(g => typeof g === 'string')
       : STANDAARD_GERECHTEN.slice();
+    uit.todos = Array.isArray(data.todos)
+      ? data.todos.filter(t => t && t.id && typeof t.titel === 'string').map(t => ({
+        id: t.id, titel: t.titel, deadline: typeof t.deadline === 'string' ? t.deadline : null,
+        wie: t.wie || null, klaar: !!t.klaar
+      }))
+      : [];
     for (let i = 0; i < 7; i++) {
       const bron = (Array.isArray(data.week) && data.week[i]) || {};
       const leeg = leegDagpatroon(i);
@@ -349,6 +355,71 @@
     };
     data.week.forEach(wis);
     Object.values(data.aanpassingen).forEach(wis);
+    (data.todos || []).forEach(t => { if (t.wie === id) t.wie = null; });
+  }
+
+  /* ---------- Todo's ---------- */
+
+  /** Todo toevoegen of aanpassen. Geeft de bewaarde todo terug. */
+  function bewaarTodo(data, todo) {
+    if (!Array.isArray(data.todos)) data.todos = [];
+    const titel = String(todo.titel || '').replace(/\s+/g, ' ').trim();
+    if (!titel) return null;
+    const bestaand = todo.id && data.todos.find(t => t.id === todo.id);
+    const nieuw = {
+      id: bestaand ? bestaand.id : maakId(),
+      titel: titel,
+      deadline: todo.deadline || null,
+      wie: todo.wie || null,
+      klaar: bestaand ? !!(todo.klaar !== undefined ? todo.klaar : bestaand.klaar) : !!todo.klaar
+    };
+    if (bestaand) Object.assign(bestaand, nieuw);
+    else data.todos.push(nieuw);
+    return bestaand || nieuw;
+  }
+
+  function verwijderTodo(data, id) {
+    data.todos = (data.todos || []).filter(t => t.id !== id);
+  }
+
+  function zetTodoKlaar(data, id, klaar) {
+    const t = (data.todos || []).find(x => x.id === id);
+    if (t) t.klaar = !!klaar;
+    return t || null;
+  }
+
+  /** Volgorde: eerst op deadline (zonder deadline achteraan), dan op titel. */
+  function sorteerTodos(lijst) {
+    return lijst.slice().sort((a, b) =>
+      (a.deadline || '9999').localeCompare(b.deadline || '9999') || a.titel.localeCompare(b.titel, 'nl'));
+  }
+
+  /**
+   * Todo's voor één dag: alles met die deadline. Op vandaag komen ook
+   * open todo's waarvan de deadline al voorbij is (met telaat: true).
+   */
+  function todosVoorDag(data, datum, vandaag) {
+    const s = datumSleutel(datum);
+    const isVandaag = vandaag && datumSleutel(vandaag) === s;
+    const uit = (data.todos || []).filter(t =>
+      t.deadline === s || (isVandaag && !t.klaar && t.deadline && t.deadline < s));
+    return sorteerTodos(uit).map(t => Object.assign({}, t, { telaat: t.deadline < s }));
+  }
+
+  /** Groepen voor het todo-scherm. */
+  function todoGroepen(data, vandaag) {
+    const s = datumSleutel(vandaag);
+    const eindeWeek = datumSleutel(plusDagen(maandagVan(vandaag), 6));
+    const g = { telaat: [], vandaag: [], week: [], later: [], geenDatum: [], klaar: [] };
+    sorteerTodos(data.todos || []).forEach(t => {
+      if (t.klaar) g.klaar.push(t);
+      else if (!t.deadline) g.geenDatum.push(t);
+      else if (t.deadline < s) g.telaat.push(t);
+      else if (t.deadline === s) g.vandaag.push(t);
+      else if (t.deadline <= eindeWeek) g.week.push(t);
+      else g.later.push(t);
+    });
+    return g;
   }
 
   function volgendeKleur(data) {
@@ -457,6 +528,22 @@
         !b.activiteiten.some(y => y.titel === x.titel)).forEach(x =>
         voeg('act-' + x.titel, 'Geschrapt: ' + x.titel));
     }
+    // Todo's: nieuw, aangepast of afgevinkt (enkel met een deadline vanaf vandaag of te laat).
+    const oudeTodos = {};
+    (oud.todos || []).forEach(t => { oudeTodos[t.id] = t; });
+    const eind = datumSleutel(plusDagen(vanaf, (dagen || 14) - 1));
+    (nieuw.todos || []).forEach(t => {
+      const o = oudeTodos[t.id];
+      const datum = t.deadline || datumSleutel(vanaf);
+      if (datum > eind) return;
+      const voor = t.wie ? ' (' + naam(t.wie) + ')' : '';
+      let tekst = null;
+      if (!o) tekst = 'Todo: ' + t.titel + voor;
+      else if (!o.klaar && t.klaar) tekst = 'Afgevinkt: ' + t.titel;
+      else if (o.klaar && !t.klaar) tekst = 'Todo weer open: ' + t.titel;
+      else if (o.titel !== t.titel || o.deadline !== t.deadline || o.wie !== t.wie) tekst = 'Todo: ' + t.titel + voor;
+      if (tekst) uit.push({ sleutel: 'todo|' + t.id, datum: datum, tekst: tekst });
+    });
     return uit;
   }
 
@@ -474,7 +561,8 @@
     zetVeld, herstelVeld, bewaarActiviteit, verwijderActiviteit, herstelActiviteit,
     ruimOudeAanpassingenOp, lid, verwijderLid, volgendeKleur, zetNamen, leesGezinLink,
     voegGerechtToe, verwijderGerecht, gerechtenLijst, zoekGerecht,
-    verschillen, voegWijzigingenToe
+    verschillen, voegWijzigingenToe,
+    bewaarTodo, verwijderTodo, zetTodoKlaar, sorteerTodos, todosVoorDag, todoGroepen
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Logica;

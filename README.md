@@ -12,6 +12,10 @@ wie brengt de kinderen naar school, wie haalt ze op, welke activiteiten er zijn 
   afwijkt van de standaardweek. *Standaardweek aanpassen* is de snelste manier om de vaste planning
   in te vullen: per weekdag kies je wie brengt en haalt, wat er gegeten wordt en vaste activiteiten
   (zwemles, muziekschool…).
+- **Todo's**: taken met een deadline en een persoon, die je kan afvinken. Ze staan gegroepeerd
+  (te laat, vandaag, deze week, later) en je kan filteren per persoon. Op de dag van de deadline
+  verschijnen ze ook in *Vandaag* en *Week*, onder de activiteiten. Open todo's die te laat zijn,
+  blijven op *Vandaag* staan tot ze afgevinkt zijn.
 - **Gezin**: namen, kleuren en extra personen (grootouders, oppas, opvang). Hier kan je ook
   exporteren en importeren.
 
@@ -63,6 +67,10 @@ De tests (Node, ingebouwde testrunner) controleren de planningslogica in `js/log
 Optioneel, via een gratis Supabase-project. Volg het stappenplan in [DELEN.md](DELEN.md).
 Zonder Supabase werkt de app gewoon lokaal op één toestel.
 
+## Todo's toevoegen met Siri
+
+"Hé Siri, ik heb een nieuwe todo": zie [SIRI.md](SIRI.md). Werkt ook via CarPlay.
+
 ## Online zetten
 
 De app kan op GitHub Pages: *Settings* > *Pages* > *Deploy from a branch*, map `/ (root)`.
@@ -75,6 +83,7 @@ JSON-document in de tabel `planning`:
 
 - een **standaardweek** (maandag tot zondag),
 - **aanpassingen per datum** die de standaardweek voor die ene dag overschrijven,
-- eenmalige activiteiten en overgeslagen vaste activiteiten per datum.
+- eenmalige activiteiten en overgeslagen vaste activiteiten per datum,
+- de **todo's** (titel, deadline, persoon, afgevinkt of niet).
 
 Aanpassingen ouder dan 60 dagen worden automatisch opgeruimd.
