@@ -43,9 +43,10 @@ Open **Opdrachten** (Shortcuts) en tik op **+**. Voeg deze acties toe, in deze v
 4. **Vraag om invoer** (Ask for Input)
    - Type: *Datum*
    - Vraag: *Tegen wanneer?*
-5. **Wijzig datumnotatie** (Format Date)
+5. **Wijzig datumnotatie** (Format Date), mag je ook weglaten
    - Datum: *Gevraagde invoer* (van stap 4)
    - Notatie: *ISO 8601*, zonder tijd
+   - Laat je deze stap weg, gebruik dan in stap 6 bij `deadline` rechtstreeks de *Gevraagde invoer* van stap 4. De app begrijpt ook "26 nov. 2026 om 14:00".
 6. **Haal inhoud op van URL** (Get Contents of URL)
    - URL: het **Adres**
    - Methode: *POST*
@@ -62,10 +63,14 @@ Noem de opdracht exact **Ik heb een nieuwe todo**. Die naam is de zin die je teg
 
 ### 4. Proberen
 
-Zeg "Hé Siri, ik heb een nieuwe todo". Siri antwoordt bijvoorbeeld *"Oké, todo toegevoegd: Turnzak wassen voor Polly."* De todo verschijnt meteen in de app onder **Todo's**, en op de dag van de deadline ook in **Vandaag** en **Week**.
+Zeg "Hé Siri, ik heb een nieuwe todo". Siri antwoordt bijvoorbeeld *"Oké, todo toegevoegd: Turnzak wassen voor Polly, tegen 05/12."* De todo verschijnt meteen in de app onder **Todo's**, en op de dag van de deadline ook in **Vandaag** en **Week**.
 
 ## Problemen
 
+- **De todo heet een datum** (bv. "26 nov. 2026"): in stap 6 staat bij `titel` de invoer van stap 4 (de datum) in plaats van die van stap 1. Tik op het veld, verwijder de variabele en kies opnieuw *Gevraagde invoer* van **Wat moet er gebeuren?**. Opdrachten noemt beide invoeren hetzelfde, dus kijk goed welke je kiest.
+- **Geen deadline**: bij `deadline` staat niets, of iets wat geen datum is.
+- **Deel je opdracht niet via een iCloud-link.** Je Siri-sleutel zit erin. Deed je dat toch, maak dan in de app een nieuwe sleutel en plak die in stap 6.
+
 - **"De Siri-sleutel klopt niet"**: maak in de app een nieuwe sleutel en plak die in stap 6.
 - **Een foutmelding over een functie of "schema cache"**: stap 1 is nog niet gebeurd.
-- **De naam wordt niet herkend**: de naam in de lijst (stap 2) moet hetzelfde zijn als in de app onder Gezin. Hoofdletters maken niet uit.
+- **De naam wordt niet herkend**: de naam in de lijst (stap 2) moet hetzelfde zijn als in de app onder Gezin, of er het begin van zijn ("Poll" werkt voor Polly). Hoofdletters maken niet uit.

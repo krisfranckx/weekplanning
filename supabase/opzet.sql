@@ -109,6 +109,55 @@ begin
 end;
 $$;
 
+-- Datum uit de Siri-opdracht lezen. Werkt met JJJJ-MM-DD (ook met tijd erachter), 26/11/2026,
+-- "26 nov. 2026", "donderdag 26 november 2026 om 14:00" en "Nov 26, 2026". Anders null.
+create or replace function public.siri_datum(tekst text)
+returns text
+language plpgsql
+immutable
+set search_path = public, extensions
+as $$
+declare
+  t text := lower(trim(coalesce(tekst, '')));
+  m text[];
+  dag int;
+  maand int;
+  jaar int;
+  maanden text := '(jan|feb|maa|mrt|mar|apr|mei|may|jun|jul|aug|sep|okt|oct|nov|dec)[a-zé]*';
+  woord text;
+begin
+  if t = '' then return null; end if;
+  m := regexp_match(t, '(\d{4})-(\d{1,2})-(\d{1,2})');
+  if m is not null then
+    jaar := m[1]::int; maand := m[2]::int; dag := m[3]::int;
+  else
+    m := regexp_match(t, '(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})');
+    if m is not null then
+      dag := m[1]::int; maand := m[2]::int; jaar := m[3]::int;
+    else
+      m := regexp_match(t, '(\d{1,2})\.?\s+' || maanden || '\.?,?\s+(\d{2,4})');
+      if m is not null then
+        dag := m[1]::int; woord := m[2]; jaar := m[3]::int;
+      else
+        m := regexp_match(t, maanden || '\.?\s+(\d{1,2}),?\s+(\d{2,4})');
+        if m is null then return null; end if;
+        woord := m[1]; dag := m[2]::int; jaar := m[3]::int;
+      end if;
+      maand := case woord
+        when 'jan' then 1 when 'feb' then 2 when 'maa' then 3 when 'mrt' then 3 when 'mar' then 3
+        when 'apr' then 4 when 'mei' then 5 when 'may' then 5 when 'jun' then 6 when 'jul' then 7
+        when 'aug' then 8 when 'sep' then 9 when 'okt' then 10 when 'oct' then 10
+        when 'nov' then 11 when 'dec' then 12 end;
+    end if;
+  end if;
+  if maand is null then return null; end if;
+  if jaar < 100 then jaar := jaar + 2000; end if;
+  return to_char(make_date(jaar, maand, dag), 'YYYY-MM-DD');
+exception when others then
+  return null;
+end;
+$$;
+
 -- Todo toevoegen met een Siri-sleutel. wie = naam zoals in de app (of leeg), deadline = JJJJ-MM-DD (of leeg).
 create or replace function public.todo_via_siri(sleutel text, titel text, wie text default null, deadline text default null)
 returns text
@@ -134,15 +183,19 @@ begin
   if schoon = '' then
     return 'Ik heb geen todo gehoord.';
   end if;
-  if datum is not null then
-    datum := left(datum, 10);
-    if datum !~ '^\d{4}-\d{2}-\d{2}$' then datum := null; end if;
-  end if;
+  datum := public.siri_datum(datum);
 
+  -- Naam zoals in de app; lukt dat niet, dan de enige naam die ermee begint ("Poll" wordt "Polly").
   select l ->> 'id', l ->> 'naam' into lid_id, lid_naam
   from public.planning p, jsonb_array_elements(p.data -> 'leden') l
   where p.id = 1 and lower(trim(l ->> 'naam')) = lower(trim(coalesce(wie, '')))
   limit 1;
+  if lid_id is null and length(trim(coalesce(wie, ''))) >= 2 then
+    select min(l ->> 'id'), min(l ->> 'naam') into lid_id, lid_naam
+    from public.planning p, jsonb_array_elements(p.data -> 'leden') l
+    where p.id = 1 and lower(trim(l ->> 'naam')) like lower(trim(wie)) || '%'
+    having count(*) = 1;
+  end if;
 
   todo := jsonb_build_object(
     'id', 'siri-' || encode(gen_random_bytes(6), 'hex'),
@@ -163,12 +216,14 @@ begin
   end if;
 
   return 'Oké, todo toegevoegd: ' || (todo ->> 'titel') ||
-    case when lid_id is not null then ' voor ' || lid_naam else '' end || '.';
+    case when lid_id is not null then ' voor ' || lid_naam else '' end ||
+    case when datum is not null then ', tegen ' || to_char(datum::date, 'DD/MM') else '' end || '.';
 end;
 $$;
 
 revoke all on function public.maak_siri_sleutel() from public, anon;
 grant execute on function public.maak_siri_sleutel() to authenticated;
+revoke all on function public.siri_datum(text) from public, anon;
 revoke all on function public.todo_via_siri(text, text, text, text) from public;
 grant execute on function public.todo_via_siri(text, text, text, text) to anon, authenticated;
 
