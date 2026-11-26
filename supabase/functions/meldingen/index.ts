@@ -197,6 +197,8 @@
       }))
       : [];
     uit.vakanties = data.vakanties !== false;
+    // Afvalophaling: wordt in js/afval.js verder nagekeken.
+    if (data.afval && typeof data.afval === 'object') uit.afval = data.afval;
     uit.agendaWie = {};
     if (data.agendaWie && typeof data.agendaWie === 'object') {
       Object.keys(data.agendaWie).forEach(k => {

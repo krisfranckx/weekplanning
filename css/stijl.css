@@ -632,3 +632,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .melding-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 6px 0 0 26px; font-size: .9rem; }
 .melding-sub .vinkje { margin-top: 0; }
 .melding-sub input[type=time] { width: auto; }
+
+/* Afvalophaling (Gezin) */
+.afval-lijst { list-style: none; margin: 4px 0 12px; padding: 0; }
+.afval-lijst li + li { border-top: 1px solid var(--lijn); }
+.afval-lijst button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.afval-kaart .vinkje { margin-top: 8px; }

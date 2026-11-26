@@ -4,7 +4,7 @@
 
   const L = window.Logica;
   const OPSLAG_SLEUTEL = 'weekplanning.v1';
-  const APP_VERSIE = '25 (26 nov 2026)';
+  const APP_VERSIE = '26 (26 nov 2026)';
   const AGENDA_SLEUTEL = 'weekplanning.agenda';
   const AGENDA_INTERVAL = 15 * 60 * 1000; // agenda hoogstens om de 15 minuten opnieuw ophalen
 
@@ -165,7 +165,8 @@
     if (!a || !a.ingesteld || !Array.isArray(a.agendas)) return [];
     const sleutel = L.datumSleutel(datum);
     const lijst = [];
-    a.agendas.forEach(ag => (ag.dagen[sleutel] || []).forEach(x => lijst.push(Object.assign({}, x, { id: ag.nr + '-' + x.id }))));
+    const afvalNrs = afval().agendas; // afvalkalenders worden todo's, geen activiteiten
+    a.agendas.filter(ag => !afvalNrs.includes(String(ag.nr))).forEach(ag => (ag.dagen[sleutel] || []).forEach(x => lijst.push(Object.assign({}, x, { id: ag.nr + '-' + x.id }))));
     return lijst.map(x => {
       const gekozen = x.uid ? L.agendaWieVoor(staat.data, x.uid, sleutel) : null;
       const tekst = x.uid ? L.agendaTekstVoor(staat.data, x.uid, sleutel) : {};
@@ -233,6 +234,109 @@
   function activiteitenMetAgenda(plan, datum) {
     const volgorde = x => (x.heleDag ? '00:00' : '') + (x.tijd || '99:99');
     return plan.activiteiten.concat(agendaVoorDag(datum)).sort((x, y) => volgorde(x).localeCompare(volgorde(y)));
+  }
+
+  // ---------- Afvalophaling ----------
+  // De todo's worden berekend uit het schema (Gezin > Afvalophaling) en uit agenda's die
+  // als afvalkalender aangevinkt zijn. Alleen vinkjes en verschuivingen worden bewaard.
+
+  const A = window.Afval;
+
+  function afval() {
+    staat.data.afval = A.normaliseer(staat.data.afval);
+    return staat.data.afval;
+  }
+
+  /** Ophalingen uit agenda's die als afvalkalender aangevinkt zijn. */
+  function afvalUitAgenda() {
+    const a = staat.agenda;
+    const nrs = afval().agendas;
+    if (!nrs.length || !a || !a.ingesteld || !Array.isArray(a.agendas)) return [];
+    const uit = [];
+    a.agendas.filter(ag => nrs.includes(String(ag.nr))).forEach(ag => Object.keys(ag.dagen || {}).forEach(datum =>
+      ag.dagen[datum].forEach(x => uit.push({ uid: ag.nr + '-' + (x.uid || x.id), titel: x.titel, datum: datum }))));
+    return uit;
+  }
+
+  /** De planning met de afval-todo's (deadline tussen van en tot) erbij, alleen om te tonen. */
+  function metAfval(van, tot) {
+    const extra = A.todos(afval(), L.datumSleutel(van), L.datumSleutel(tot), afvalUitAgenda());
+    return Object.assign({}, staat.data, { todos: (staat.data.todos || []).concat(extra) });
+  }
+
+  function bewerkAfvalTodo(t) {
+    const uitAgenda = t.afval.sleutel.indexOf('ag:') === 0;
+    let html = '<h2>' + ic('vuilbak') + e(t.titel) + '</h2>' +
+      '<p class="uitleg">Ophaling op ' + e(L.datumLang(L.vanSleutel(t.afval.ophaling))) + '. Deze todo komt ' +
+      (uitAgenda ? 'uit je afvalkalender.' : 'uit het ophaalschema bij Gezin.') + ' Verschoven door een feestdag? Kies hier een andere dag om het buiten te zetten.</p>' +
+      '<label class="veld">Buitenzetten op<input type="date" name="deadline" required value="' + e(t.deadline) + '"></label>' +
+      '<label class="vinkje todo-klaar"><input type="checkbox" name="klaar"' + (t.klaar ? ' checked' : '') + '> Afgevinkt</label>';
+    html += bladKnoppen((t.afval.verzet ? '<button type="button" class="link" data-blad="terug">Terug zoals gepland</button>' : '') +
+      '<button type="button" class="link gevaar" data-blad="geen">Deze keer geen ophaling</button>');
+    openBlad(html, (form, knop) => {
+      const a = afval();
+      if (knop === 'geen') { A.verzet(a, t.id, ''); bewaar('Deze ophaling overgeslagen'); return; }
+      if (knop === 'terug') { A.verzet(a, t.id, null); bewaar('Teruggezet'); return; }
+      const f = new FormData(form);
+      const datum = f.get('deadline');
+      if (!datum) return false;
+      A.verzet(a, t.id, datum);
+      A.zetKlaar(a, t.id, f.get('klaar') === 'on');
+      bewaar('Opgeslagen');
+    });
+  }
+
+  function bewerkAfvalSoort(soort) {
+    const nieuw = !soort;
+    const s = soort || { naam: '', vanaf: '', elke: 2, wie: null };
+    const vanaf = soort ? A.volgende(soort, L.datumSleutel(vandaag())) : '';
+    let html = '<h2>' + ic('vuilbak') + (nieuw ? 'Afvalsoort toevoegen' : e(s.naam)) + '</h2>' +
+      '<label class="veld">Welk afval?<input type="text" name="naam" required list="afval-voorbeelden" value="' + e(s.naam) +
+      '" placeholder="bv. PMD, Restafval, Papier en karton" autocomplete="off"></label>' +
+      '<datalist id="afval-voorbeelden">' + A.VOORBEELDEN.map(x => '<option value="' + e(x) + '">').join('') + '</datalist>' +
+      '<label class="veld">Eerstvolgende ophaling<input type="date" name="vanaf" required value="' + e(vanaf) + '"></label>' +
+      '<label class="veld">Hoe vaak?<select name="elke">' + [1, 2, 3, 4, 8].map(n => '<option value="' + n + '"' + (s.elke === n ? ' selected' : '') + '>' +
+        (n === 1 ? 'Elke week' : 'Om de ' + n + ' weken') + '</option>').join('') + '</select></label>' +
+      '<p class="veld-label">Wie zet het buiten?</p>' + persoonChips('wie', s.wie, false, true) +
+      '<p class="uitleg">De datums vind je in de Recycle!-app. De avond ervoor verschijnt een todo.</p>';
+    html += bladKnoppen(nieuw ? '' : '<button type="button" class="link gevaar" data-blad="wis">Verwijderen</button>');
+    openBlad(html, (form, knop) => {
+      const a = afval();
+      if (knop === 'wis') { A.verwijderSoort(a, s.id); bewaar(s.naam + ' verwijderd'); teken(); return; }
+      const f = new FormData(form);
+      const bewaard = A.bewaarSoort(a, { id: s.id, naam: f.get('naam'), vanaf: f.get('vanaf'), elke: f.get('elke'), wie: f.get('wie') || null });
+      if (!bewaard) return false;
+      bewaar(bewaard.naam + ' ' + A.ritmeTekst(bewaard));
+      teken();
+    });
+  }
+
+  function afvalKaartHtml() {
+    const a = afval();
+    const v = L.datumSleutel(vandaag());
+    let html = '<section class="kaart afval-kaart"><div class="kaart-kop"><span class="icoon">' + ic('vuilbak') + '</span><h2>Afvalophaling</h2></div>';
+    if (a.soorten.length) {
+      html += '<ul class="afval-lijst">' + a.soorten.map(s => {
+        const volgende = A.volgende(s, v);
+        return '<li><button data-actie="afval-soort" data-id="' + e(s.id) + '"><strong>' + e(s.naam) + '</strong>' +
+          '<span class="klein-grijs">' + e(A.ritmeTekst(s)) + (volgende ? ' · volgende: ' + e(L.datumKort(L.vanSleutel(volgende))) : '') +
+          '</span></button></li>';
+      }).join('') + '</ul>';
+    }
+    html += '<button class="knop secundair" data-actie="afval-soort">' + ic('plus') + 'Afvalsoort toevoegen</button>';
+    const ag = window.Sync && window.Sync.gebruiker() && staat.agenda && staat.agenda.ingesteld && Array.isArray(staat.agenda.agendas)
+      ? staat.agenda.agendas : [];
+    if (ag.length) {
+      html += '<p class="veld-label">Afvalkalender uit een gekoppelde agenda</p>' + ag.map((x, i) =>
+        '<label class="vinkje"><input type="checkbox" data-instelling="afval-agenda" data-nr="' + e(x.nr) + '"' +
+        (a.agendas.includes(String(x.nr)) ? ' checked' : '') + '> Agenda ' + (i + 1) + ' · ' + e(x.bron || '') + '</label>').join('');
+    }
+    html += '<p class="uitleg">De avond voor elke ophaling verschijnt een todo, bv. "PMD buitenzetten". De ophaaldagen vind je in de Recycle!-app. ' +
+      'Verschuift een ophaling door een feestdag? Tik op de todo en kies een andere dag.' +
+      (window.Sync && window.Sync.gebruiker()
+        ? ' Heeft je gemeente een ophaalkalender als agenda-link (iCal)? Koppel die bij Agenda\'s en vink hem hier aan: dan komen de ophalingen er vanzelf in, ook verschuivingen.'
+        : '') + '</p>';
+    return html + '</section>';
   }
 
   // ---------- Hulpjes ----------
@@ -348,7 +452,7 @@
       html += '<button class="naar-vandaag" data-actie="naar-vandaag">' + ic('terugdraaien') + 'Terug naar vandaag</button>';
     }
     // Achterstallige todo's (alleen vandaag) helemaal bovenaan
-    const todos = L.todosVoorDag(staat.data, staat.datum, vandaag());
+    const todos = L.todosVoorDag(metAfval(staat.datum, staat.datum), staat.datum, vandaag());
     const telaat = todos.filter(t => t.telaat);
     if (telaat.length) {
       html += '<section class="kaart lijst dag-todos todo-telaat"><ul class="todos">' + telaat.map(t => todoRij(t, false)).join('') + '</ul></section>';
@@ -472,7 +576,7 @@
       if (acts.length) {
         html += '<span class="wd-regel klein-grijs">' + ic('activiteit', 'mini') + acts.map(a => e(a.titel)).join(', ') + '</span>';
       }
-      const todos = L.todosVoorDag(staat.data, datum, null);
+      const todos = L.todosVoorDag(metAfval(datum, datum), datum, null);
       if (todos.length) {
         html += '<span class="wd-regel klein-grijs">' + ic('vinkje', 'mini') + todos.map(t => e(t.titel)).join(', ') + '</span>';
       }
@@ -518,7 +622,9 @@
     const d = staat.data;
     if (staat.todoFilter && !L.lid(d, staat.todoFilter)) staat.todoFilter = '';
     const filter = staat.todoFilter;
-    const gefilterd = Object.assign({}, d, { todos: (d.todos || []).filter(t => !filter || t.wie === filter) });
+    // Afval-todo's: alleen de komende week en niet afgevinkt (die verdwijnen vanzelf).
+    const alle = metAfval(vandaag(), L.plusDagen(vandaag(), 7)).todos.filter(t => !(t.afval && t.klaar));
+    const gefilterd = Object.assign({}, d, { todos: alle.filter(t => !filter || t.wie === filter) });
     const g = L.todoGroepen(gefilterd, vandaag());
 
     let html = '<button class="knop breed-knop" data-actie="nieuwe-todo">' + ic('plus') + 'Todo toevoegen</button>';
@@ -580,6 +686,14 @@
   }
 
   function vinkTodo(id, klaar) {
+    if (A.isAfvalId(id)) {
+      const a = afval();
+      A.zetKlaar(a, id, klaar);
+      A.ruimOp(a, L.datumSleutel(vandaag()));
+      bewaar(klaar ? 'Afgevinkt' : 'Weer open');
+      setTimeout(teken, klaar ? 350 : 0);
+      return;
+    }
     const t = L.zetTodoKlaar(staat.data, id, klaar);
     if (!t) return;
     bewaar(klaar ? 'Afgevinkt: ' + t.titel : 'Weer open: ' + t.titel);
@@ -697,6 +811,8 @@
       '<label class="vinkje"><input type="checkbox" name="vakanties" data-instelling="vakanties"' + (staat.data.vakanties !== false ? ' checked' : '') + '> ' +
       'Vlaamse schoolvakanties en vrije dagen automatisch</label>' +
       '<p class="uitleg">Op die dagen valt brengen en ophalen vanzelf weg. Een pedagogische studiedag of andere vrije dag van jullie school zet je zelf via "Geen school vandaag?" onderaan de dag.</p></section>';
+
+    html += afvalKaartHtml();
 
     html += deelKaartHtml();
     if (window.Sync && window.Sync.gebruiker()) html += meldingKaartHtml() + agendaKaartHtml() + siriKaartHtml();
@@ -1464,10 +1580,18 @@
         bewerkTodo(null, knop.dataset.datum);
         break;
       case 'bewerk-todo': {
+        if (A.isAfvalId(knop.dataset.id)) {
+          const t = A.zoekTodo(afval(), knop.dataset.id, afvalUitAgenda());
+          if (t) bewerkAfvalTodo(t);
+          break;
+        }
         const todo = (d.todos || []).find(t => t.id === knop.dataset.id);
         if (todo) bewerkTodo(todo);
         break;
       }
+      case 'afval-soort':
+        bewerkAfvalSoort(afval().soorten.find(s => s.id === knop.dataset.id) || null);
+        break;
       case 'todo-filter':
         staat.todoFilter = knop.dataset.wie;
         teken();
@@ -1582,6 +1706,11 @@
     if (doel.dataset && doel.dataset.instelling === 'vakanties') {
       staat.data.vakanties = doel.checked;
       bewaar(doel.checked ? 'Schoolvakanties staan aan' : 'Schoolvakanties staan uit');
+      return;
+    }
+    if (doel.dataset && doel.dataset.instelling === 'afval-agenda') {
+      A.zetAgenda(afval(), doel.dataset.nr, doel.checked);
+      bewaar(doel.checked ? 'Afvalkalender: de ophalingen worden todo\'s' : 'Weer een gewone agenda');
       return;
     }
     if (doel.id === 'importeer') {
